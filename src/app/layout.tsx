@@ -2,6 +2,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { Navbar } from "@/components/shared/navbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SalonBook | Discover Your Beauty",
+  title: "SalonBook | Beauty & Wellness",
   description:
-    "Discover premium salon services and book your next appointment with SalonBook.",
+    "Discover premium salon services and book your next beauty appointment with SalonBook.",
 };
 
 export default function RootLayout({
@@ -25,9 +27,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <ThemeProvider>
+          <Navbar />
+          <main className="min-h-screen">{children}</main>
+        </ThemeProvider>
       </body>
     </html>
   );
