@@ -77,7 +77,7 @@ export function Navbar() {
           </Button>
 
           <Button  className="rounded-full px-6">
-            <Link href="/sign-up">Get Started</Link>
+            <Link href="/sign-up">Sign Up</Link>
           </Button>
         </div>
 
@@ -136,7 +136,7 @@ export function Navbar() {
                       href="/sign-up"
                       className="flex h-11 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
                     >
-                      Get Started
+                      Sign Up 
                     </Link>
                   </SheetClose>
                 </div>
