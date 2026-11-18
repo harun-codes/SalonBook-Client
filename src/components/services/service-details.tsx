@@ -1,4 +1,8 @@
 
+"use client";
+
+import { useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
 import {
     ArrowLeft,
@@ -8,7 +12,10 @@ import {
     CheckCircle2,
     ShieldCheck,
     Sparkles,
+    Loader2,
+    ClipboardList,
 } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 
 export interface Service {
     _id: string;
@@ -21,12 +28,134 @@ export interface Service {
     status: string;
 }
 
+const TIME_SLOTS = [
+    "10:00 AM",
+    "11:00 AM",
+    "12:00 PM",
+    "01:00 PM",
+    "02:00 PM",
+    "03:00 PM",
+    "04:00 PM",
+    "05:00 PM",
+    "06:00 PM",
+];
+
+function getDhakaToday() {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Dhaka",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(new Date());
+
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+
+    return `${year}-${month}-${day}`;
+}
+
 export default function ServiceDetails({
     service,
 }: {
     service: Service;
 }) {
+    const { data: session, isPending } = authClient.useSession();
+
+    const [appointmentDate, setAppointmentDate] = useState("");
+    const [timeSlot, setTimeSlot] = useState("");
+    const [message, setMessage] = useState("");
+
+    const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
+    const [successMessage, setSuccessMessage] = useState("");
+    const [appointmentId, setAppointmentId] = useState("");
+
     const isActive = service.status?.toLowerCase() === "active";
+
+    const handleBooking = async (
+        e: FormEvent<HTMLFormElement>
+    ) => {
+        e.preventDefault();
+
+        setErrorMessage("");
+        setSuccessMessage("");
+        setAppointmentId("");
+
+        if (!appointmentDate || !timeSlot) {
+            setErrorMessage("Please select an appointment date and time.");
+            return;
+        }
+
+        if (appointmentDate < getDhakaToday()) {
+            setErrorMessage("Appointment date cannot be in the past.");
+            return;
+        }
+
+        if (message.length > 500) {
+            setErrorMessage("Message must not exceed 500 characters.");
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            const { data: tokenData, error: tokenError } =
+                await authClient.token();
+
+            if (tokenError || !tokenData?.token) {
+                throw new Error(
+                    tokenError?.message || "Please sign in to book an appointment."
+                );
+            }
+
+            const apiUrl =
+                process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+            const response = await fetch(`${apiUrl}/appointments`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${tokenData.token}`,
+                },
+                body: JSON.stringify({
+                    serviceId: service._id,
+                    appointmentDate,
+                    timeSlot,
+                    message: message.trim(),
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message || "Failed to create appointment."
+                );
+            }
+
+            setSuccessMessage(
+                result.message || "Appointment request submitted successfully."
+            );
+
+            setAppointmentId(result.appointment?._id || "");
+
+            setAppointmentDate("");
+            setTimeSlot("");
+            setMessage("");
+
+        } catch (error) {
+            console.error("Appointment booking error:", error);
+
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Something went wrong. Please try again."
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <main className="min-h-screen bg-background text-foreground">
@@ -34,7 +163,7 @@ export default function ServiceDetails({
 
                 <Link
                     href="/services"
-                    className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-[#075E46] dark:hover:text-[#A7E8C5]"
+                    className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-primary"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Back to Services
@@ -60,22 +189,23 @@ export default function ServiceDetails({
 
                         <div className="mb-5 flex flex-wrap items-center gap-3">
 
-                            <span className="rounded-full bg-[#E8FFF2] px-4 py-2 text-sm font-bold text-[#075E46] dark:bg-[#203B2E] dark:text-[#A7E8C5]">
+                            <span className="rounded-full bg-secondary px-4 py-2 text-sm font-bold text-secondary-foreground">
                                 {service.category}
                             </span>
 
                             <span
-                                className={`rounded-full px-4 py-2 text-sm font-semibold ${isActive
-                                    ? "bg-[#E8FFF2] text-[#075E46] dark:bg-[#203B2E] dark:text-[#A7E8C5]"
-                                    : "bg-muted text-muted-foreground"
-                                    }`}
+                                className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                                    isActive
+                                        ? "bg-secondary text-secondary-foreground"
+                                        : "bg-muted text-muted-foreground"
+                                }`}
                             >
                                 {isActive ? "Available" : "Unavailable"}
                             </span>
 
                         </div>
 
-                        <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-[#032D22] dark:text-[#B7F7D4] sm:text-4xl lg:text-5xl">
+                        <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl lg:text-5xl">
                             {service.serviceName}
                         </h1>
 
@@ -90,7 +220,7 @@ export default function ServiceDetails({
                                     Service Price
                                 </p>
 
-                                <h2 className="mt-2 text-2xl font-extrabold text-[#032D22] dark:text-[#B7F7D4]">
+                                <h2 className="mt-2 text-2xl font-extrabold text-foreground">
                                     ৳{Number(service.price).toLocaleString("en-BD")}
                                 </h2>
                             </div>
@@ -101,7 +231,7 @@ export default function ServiceDetails({
                                 </p>
 
                                 <h2 className="mt-2 flex items-center gap-2 text-2xl font-extrabold text-foreground">
-                                    <Clock3 className="h-5 w-5 text-[#075E46] dark:text-[#A7E8C5]" />
+                                    <Clock3 className="h-5 w-5 text-primary" />
                                     {service.duration} min
                                 </h2>
                             </div>
@@ -111,8 +241,8 @@ export default function ServiceDetails({
                         <div className="rounded-2xl border border-border bg-card p-6">
 
                             <div className="flex items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#E8FFF2] dark:bg-[#203B2E]">
-                                    <CalendarDays className="h-5 w-5 text-[#075E46] dark:text-[#A7E8C5]" />
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary">
+                                    <CalendarDays className="h-5 w-5 text-secondary-foreground" />
                                 </div>
 
                                 <div>
@@ -126,38 +256,202 @@ export default function ServiceDetails({
                                 </div>
                             </div>
 
-                            {isActive ? (
-                                <div className="mt-6">
-
-                                    <div className="mb-5 flex items-start gap-3 rounded-xl bg-[#E8FFF2] p-4 dark:bg-[#203B2E]">
-                                        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#075E46] dark:text-[#A7E8C5]" />
-
-                                        <p className="text-sm leading-6 text-[#075E46] dark:text-[#A7E8C5]">
-                                            Sign in will be required before you can request an appointment.
-                                        </p>
-                                    </div>
-
-                                    <Link
-                                        href={`/sign-in?redirect=${encodeURIComponent(`/services/${service._id}`)}`}
-                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#075E46] px-6 py-4 font-bold text-white hover:bg-[#064B39] dark:bg-[#075E46] dark:hover:bg-[#096D52]"
-                                    >
-                                        Book Appointment
-                                        <ArrowRight className="h-5 w-5" />
-                                    </Link>
-
-                                </div>
-                            ) : (
+                            {!isActive ? (
                                 <div className="mt-6 rounded-xl bg-muted p-4">
                                     <p className="text-sm font-semibold text-muted-foreground">
                                         This service is currently unavailable for booking.
                                     </p>
                                 </div>
+                            ) : isPending ? (
+                                <div className="mt-6 flex items-center justify-center gap-2 rounded-xl bg-muted p-6 text-sm text-muted-foreground">
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                    Checking your account...
+                                </div>
+                            ) : !session?.user ? (
+                                <div className="mt-6">
+
+                                    <div className="mb-5 flex items-start gap-3 rounded-xl bg-secondary p-4">
+                                        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-secondary-foreground" />
+
+                                        <p className="text-sm leading-6 text-secondary-foreground">
+                                            Please sign in to your customer account before requesting an appointment.
+                                        </p>
+                                    </div>
+
+                                    <Link
+                                        href={`/sign-in?redirect=${encodeURIComponent(`/services/${service._id}`)}`}
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 font-bold text-primary-foreground transition-colors hover:opacity-90"
+                                    >
+                                        Sign In to Book
+                                        <ArrowRight className="h-5 w-5" />
+                                    </Link>
+
+                                </div>
+                            ) : (
+                                <form
+                                    onSubmit={handleBooking}
+                                    className="mt-6 space-y-5"
+                                >
+
+                                    {successMessage && (
+                                        <div
+                                            role="status"
+                                            className="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950"
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700 dark:text-green-400" />
+
+                                                <div>
+                                                    <p className="text-sm font-semibold text-green-800 dark:text-green-300">
+                                                        {successMessage}
+                                                    </p>
+
+                                                    {appointmentId && (
+                                                        <p className="mt-2 break-all text-xs text-green-700 dark:text-green-400">
+                                                            Appointment ID: {appointmentId}
+                                                        </p>
+                                                    )}
+
+                                                    <Link
+                                                        href="/dashboard/appointments"
+                                                        className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-green-800 hover:underline dark:text-green-300"
+                                                    >
+                                                        View My Appointments
+                                                        <ArrowRight className="h-4 w-4" />
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {errorMessage && (
+                                        <div
+                                            role="alert"
+                                            className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                                        >
+                                            {errorMessage}
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label
+                                            htmlFor="appointmentDate"
+                                            className="mb-2 block text-sm font-semibold"
+                                        >
+                                            Appointment Date
+                                        </label>
+
+                                        <input
+                                            id="appointmentDate"
+                                            type="date"
+                                            min={getDhakaToday()}
+                                            value={appointmentDate}
+                                            onChange={(e) => {
+                                                setAppointmentDate(e.target.value);
+                                                setErrorMessage("");
+                                            }}
+                                            required
+                                            className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label
+                                            htmlFor="timeSlot"
+                                            className="mb-2 block text-sm font-semibold"
+                                        >
+                                            Available Time Slot
+                                        </label>
+
+                                        <select
+                                            id="timeSlot"
+                                            value={timeSlot}
+                                            onChange={(e) => {
+                                                setTimeSlot(e.target.value);
+                                                setErrorMessage("");
+                                            }}
+                                            required
+                                            className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                        >
+                                            <option value="">
+                                                Select a time slot
+                                            </option>
+
+                                            {TIME_SLOTS.map((slot) => (
+                                                <option key={slot} value={slot}>
+                                                    {slot}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <label
+                                                htmlFor="message"
+                                                className="text-sm font-semibold"
+                                            >
+                                                Additional Message
+                                            </label>
+
+                                            <span className="text-xs text-muted-foreground">
+                                                {message.length}/500
+                                            </span>
+                                        </div>
+
+                                        <textarea
+                                            id="message"
+                                            value={message}
+                                            onChange={(e) => setMessage(e.target.value)}
+                                            maxLength={500}
+                                            rows={3}
+                                            placeholder="Write any special requests..."
+                                            className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center gap-2 rounded-xl bg-muted p-4">
+                                        <ClipboardList className="h-5 w-5 shrink-0 text-primary" />
+
+                                        <div className="text-sm">
+                                            <p className="font-semibold">
+                                                ৳{Number(service.price).toLocaleString("en-BD")}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Payment status will initially be unpaid.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={loading || !appointmentDate || !timeSlot}
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 font-bold text-primary-foreground transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <Loader2 className="h-5 w-5 animate-spin" />
+                                                Submitting Request...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Confirm Appointment
+                                                <ArrowRight className="h-5 w-5" />
+                                            </>
+                                        )}
+                                    </button>
+
+                                    <p className="text-center text-xs leading-5 text-muted-foreground">
+                                        Your appointment will remain pending until confirmed by the admin.
+                                    </p>
+
+                                </form>
                             )}
 
                         </div>
 
                         <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
-                            <CheckCircle2 className="h-4 w-4 text-[#075E46] dark:text-[#A7E8C5]" />
+                            <CheckCircle2 className="h-4 w-4 text-primary" />
                             Professional salon and beauty services.
                         </div>
 
