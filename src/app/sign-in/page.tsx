@@ -1,3 +1,4 @@
+
 "use client";
 
 import { FormEvent, useState } from "react";
@@ -21,12 +22,27 @@ export default function SignInPage() {
     const [showPassword, setShowPassword] = useState(false);
 
     const [message, setMessage] = useState("");
-    const [messageType, setMessageType] = useState<"success" | "error" | "">(
-        ""
-    );
+    const [messageType, setMessageType] = useState<"success" | "error" | "">("");
 
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+    const getCallbackURL = () => {
+        const callbackURL = new URLSearchParams(
+            window.location.search
+        ).get("callbackURL");
+
+        if (
+            callbackURL &&
+            callbackURL.startsWith("/") &&
+            !callbackURL.startsWith("//") &&
+            !callbackURL.includes("\\")
+        ) {
+            return callbackURL;
+        }
+
+        return "/";
+    };
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -40,13 +56,15 @@ export default function SignInPage() {
             return;
         }
 
+        const callbackURL = getCallbackURL();
+
         try {
             setIsLoading(true);
 
             const { error } = await authClient.signIn.email({
                 email: email.trim(),
                 password,
-                callbackURL: "/",
+                callbackURL,
             });
 
             if (error) {
@@ -61,7 +79,7 @@ export default function SignInPage() {
             setMessageType("success");
 
             setTimeout(() => {
-                router.push("/");
+                router.replace(callbackURL);
                 router.refresh();
             }, 800);
         } catch {
@@ -81,12 +99,13 @@ export default function SignInPage() {
 
             const { error } = await authClient.signIn.social({
                 provider: "google",
-                callbackURL: "/",
+                callbackURL: getCallbackURL(),
             });
 
             if (error) {
                 setMessage(
-                    error.message || "Google authentication failed. Please try again."
+                    error.message ||
+                    "Google authentication failed. Please try again."
                 );
                 setMessageType("error");
                 setIsGoogleLoading(false);
@@ -138,6 +157,7 @@ export default function SignInPage() {
                                         }
                                         placeholder="Enter your email"
                                         autoComplete="email"
+                                        disabled={isLoading || isGoogleLoading}
                                         className="h-12 w-full rounded-xl border border-border bg-background pl-11 pr-4 text-sm text-foreground outline-none transition focus:border-[#075E46] focus:ring-2 focus:ring-[#075E46]/10 dark:focus:border-[#A7E8C5]"
                                     />
                                 </div>
@@ -167,6 +187,7 @@ export default function SignInPage() {
                                         }
                                         placeholder="Enter your password"
                                         autoComplete="current-password"
+                                        disabled={isLoading || isGoogleLoading}
                                         className="h-12 w-full rounded-xl border border-border bg-background pl-11 pr-12 text-sm text-foreground outline-none transition focus:border-[#075E46] focus:ring-2 focus:ring-[#075E46]/10 dark:focus:border-[#A7E8C5]"
                                     />
 

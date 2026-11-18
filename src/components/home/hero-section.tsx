@@ -62,6 +62,7 @@ export function HeroSection() {
               <Link href="#why-choose-us">
                 Discover More
               </Link>
+              
             </Button>
           </div>
 

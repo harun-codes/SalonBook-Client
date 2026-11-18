@@ -1,7 +1,10 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { ArrowLeft, SearchX } from "lucide-react";
+import { auth } from "@/lib/auth";
 import ServiceDetails, {
   type Service,
 } from "@/components/services/service-details";
@@ -33,7 +36,6 @@ function ServiceNotFound() {
   return (
     <main className="flex min-h-[70vh] items-center justify-center bg-background px-5">
       <div className="max-w-md text-center">
-
         <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#E8FFF2] dark:bg-[#203B2E]">
           <SearchX className="h-9 w-9 text-[#075E46] dark:text-[#A7E8C5]" />
         </div>
@@ -54,7 +56,6 @@ function ServiceNotFound() {
           <ArrowLeft className="h-4 w-4" />
           Browse Services
         </Link>
-
       </div>
     </main>
   );
@@ -66,6 +67,17 @@ async function ServiceDetailsContent({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session) {
+    redirect(
+      `/sign-in?callbackURL=${encodeURIComponent(`/services/${id}`)}`
+    );
+  }
+
   const service = await getService(id);
 
   if (!service) {

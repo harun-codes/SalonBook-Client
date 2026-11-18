@@ -1,11 +1,14 @@
 
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import ProfileDropdown from "@/components/shared/profile-dropdown";
+import { authClient } from "@/lib/auth-client";
 import {
   Sheet,
   SheetClose,
@@ -14,7 +17,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-
 
 const navLinks = [
   {
@@ -29,15 +31,42 @@ const navLinks = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const { data: session, isPending } = authClient.useSession();
+
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const user = session?.user;
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   };
 
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+
+      const { error } = await authClient.signOut();
+
+      if (error) {
+        return;
+      }
+
+      router.replace("/");
+      router.refresh();
+    } catch {
+      setIsLoggingOut(false);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:h-20 lg:px-8">
+
         <Link href="/" className="flex items-center gap-2.5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <Scissors className="h-5 w-5" />
@@ -47,6 +76,7 @@ export function Navbar() {
             <span className="text-xl font-bold tracking-tight text-foreground">
               Salon<span className="text-orange-500">Book</span>
             </span>
+
             <span className="text-[10px] font-medium tracking-[0.15em] text-muted-foreground uppercase">
               Beauty & Wellness
             </span>
@@ -73,17 +103,37 @@ export function Navbar() {
         <div className="hidden items-center gap-3 md:flex">
           <ThemeToggle />
 
-          <Button variant="ghost"  className="rounded-full px-5">
-            <Link href="/sign-in">Sign In</Link>
-          </Button>
+          {!isPending && user ? (
+            <ProfileDropdown
+              user={user}
+              onLogout={handleLogout}
+              isLoggingOut={isLoggingOut}
+            />
+          ) : !isPending ? (
+            <>
+              <Button variant="ghost" className="rounded-full px-5">
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
 
-          <Button  className="rounded-full px-6">
-            <Link href="/sign-up">Sign Up</Link>
-          </Button>
+              <Button className="rounded-full px-6">
+                <Link href="/sign-up">Sign Up</Link>
+              </Button>
+            </>
+          ) : (
+            <div className="h-10 w-28 animate-pulse rounded-full bg-muted" />
+          )}
         </div>
 
         <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
+
+          {!isPending && user && (
+            <ProfileDropdown
+              user={user}
+              onLogout={handleLogout}
+              isLoggingOut={isLoggingOut}
+            />
+          )}
 
           <Sheet>
             <SheetTrigger
@@ -121,27 +171,29 @@ export function Navbar() {
                 ))}
               </nav>
 
-              <div className="mt-8 border-t border-border pt-6">
-                <div className="grid gap-3">
-                  <SheetClose>
-                    <Link
-                      href="/sign-in"
-                      className="flex h-11 items-center justify-center rounded-full border border-border text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                    >
-                      Sign In
-                    </Link>
-                  </SheetClose>
+              {!isPending && !user && (
+                <div className="mt-8 border-t border-border pt-6">
+                  <div className="grid gap-3">
+                    <SheetClose>
+                      <Link
+                        href="/sign-in"
+                        className="flex h-11 items-center justify-center rounded-full border border-border text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                      >
+                        Sign In
+                      </Link>
+                    </SheetClose>
 
-                  <SheetClose>
-                    <Link
-                      href="/sign-up"
-                      className="flex h-11 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
-                    >
-                      Sign Up 
-                    </Link>
-                  </SheetClose>
+                    <SheetClose>
+                      <Link
+                        href="/sign-up"
+                        className="flex h-11 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
+                      >
+                        Sign Up
+                      </Link>
+                    </SheetClose>
+                  </div>
                 </div>
-              </div>
+              )}
             </SheetContent>
           </Sheet>
         </div>
