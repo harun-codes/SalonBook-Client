@@ -24,6 +24,12 @@ export const auth = betterAuth({
         defaultValue: "customer",
         input: false,
       },
+       phone: {
+      type: "string",
+      required: false,
+      defaultValue: "",
+      input: false,
+    },
       isBlocked: {
         type: "boolean",
         required: false,
