@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,9 +34,15 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
-          <Navbar />
+          <Suspense
+            fallback={
+              <div className="h-[68px] w-full border-b border-border bg-background" />
+            }
+          >
+            <Navbar />
+          </Suspense>
           <main className="min-h-screen">{children}</main>
-           <Footer />
+          <Footer />
         </ThemeProvider>
       </body>
     </html>

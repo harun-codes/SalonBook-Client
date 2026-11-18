@@ -1,4 +1,5 @@
 
+import { Suspense } from "react";
 import Link from "next/link";
 import {
     ArrowRight,
@@ -41,7 +42,46 @@ async function getServices(): Promise<Service[]> {
     );
 }
 
-export default async function ServicesPage() {
+function ServicesLoading() {
+    return (
+        <main className="min-h-screen bg-background">
+            <section className="mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16 lg:px-10 lg:py-20">
+                <div className="mb-10 flex flex-col items-center text-center">
+                    <div className="mb-5 h-9 w-40 animate-pulse rounded-full bg-muted" />
+
+                    <div className="h-12 w-72 max-w-full animate-pulse rounded-lg bg-muted" />
+
+                    <div className="mt-5 h-12 w-full max-w-2xl animate-pulse rounded-lg bg-muted" />
+
+                    <div className="mt-6 h-5 w-36 animate-pulse rounded bg-muted" />
+                </div>
+
+                <div className="mx-auto grid max-w-6xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {Array.from({ length: 8 }).map((_, index) => (
+                        <div
+                            key={index}
+                            className="overflow-hidden rounded-2xl border border-border bg-card"
+                        >
+                            <div className="h-44 animate-pulse bg-muted" />
+
+                            <div className="space-y-4 p-4">
+                                <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
+
+                                <div className="h-10 animate-pulse rounded bg-muted" />
+
+                                <div className="h-8 animate-pulse rounded bg-muted" />
+
+                                <div className="h-10 animate-pulse rounded-lg bg-muted" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+        </main>
+    );
+}
+
+async function ServicesContent() {
     let services: Service[] = [];
     let error = false;
 
@@ -150,6 +190,7 @@ export default async function ServicesPage() {
                                             <p className="text-[11px] font-medium text-muted-foreground">
                                                 Price
                                             </p>
+
                                             <p className="mt-0.5 text-xl font-extrabold text-[#032D22] dark:text-[#B7F7D4]">
                                                 ৳{service.price.toLocaleString("en-BD")}
                                             </p>
@@ -180,5 +221,13 @@ export default async function ServicesPage() {
 
             </section>
         </main>
+    );
+}
+
+export default function ServicesPage() {
+    return (
+        <Suspense fallback={<ServicesLoading />}>
+            <ServicesContent />
+        </Suspense>
     );
 }
