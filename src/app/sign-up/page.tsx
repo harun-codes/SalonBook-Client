@@ -156,6 +156,7 @@ export default function SignUpPage() {
 
       setTimeout(() => {
         router.push("/sign-in");
+        router.refresh()
       }, 1200);
     } catch (error) {
       setMessage(
