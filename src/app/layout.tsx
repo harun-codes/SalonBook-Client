@@ -3,8 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { Navbar } from "@/components/shared/navbar";
-import { Footer } from "@/components/shared/footer";
+import { AppShell } from "@/components/shared/app-shell";
 import { Suspense } from "react";
 
 const geistSans = Geist({
@@ -36,13 +35,11 @@ export default function RootLayout({
         <ThemeProvider>
           <Suspense
             fallback={
-              <div className="h-[68px] w-full border-b border-border bg-background" />
+              <div className="min-h-screen bg-background" />
             }
           >
-            <Navbar />
+            <AppShell>{children}</AppShell>
           </Suspense>
-          <main className="min-h-screen">{children}</main>
-          <Footer />
         </ThemeProvider>
       </body>
     </html>
