@@ -5,6 +5,10 @@ import {
   FeaturedServices,
   FeaturedServicesSkeleton,
 } from "@/components/home/featured-services";
+import {
+  ServiceCategories,
+  ServiceCategoriesSkeleton,
+} from "@/components/home/service-categories";
 import { ReviewsSection } from "@/components/home/reviews-section";
 
 export default function Home() {
@@ -14,6 +18,9 @@ export default function Home() {
 
       <Suspense fallback={<FeaturedServicesSkeleton />}>
         <FeaturedServices />
+      </Suspense>
+      <Suspense fallback={<ServiceCategoriesSkeleton />}>
+        <ServiceCategories />
       </Suspense>
 
       <ReviewsSection />
