@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -24,6 +25,7 @@ import {
   Filter,
 } from "lucide-react";
 
+import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 
 interface Service {
@@ -167,13 +169,6 @@ export default function AdminServicesPage() {
     return () => clearTimeout(timeout);
   }, [fetchServices]);
 
-  const openCreateForm = () => {
-    setEditingId(null);
-    setForm(initialForm);
-    setFormError("");
-    setIsFormOpen(true);
-  };
-
   const openEditForm = async (id: string) => {
     try {
       setFormLoading(true);
@@ -293,6 +288,8 @@ export default function AdminServicesPage() {
   ) => {
     event.preventDefault();
 
+    if (!editingId) return;
+
     try {
       setSaving(true);
       setFormError("");
@@ -309,14 +306,10 @@ export default function AdminServicesPage() {
         status: form.status,
       };
 
-      const isEditing = Boolean(editingId);
-
       const response = await fetch(
-        isEditing
-          ? `${API_URL}/admin/services/${editingId}`
-          : `${API_URL}/admin/services`,
+        `${API_URL}/admin/services/${editingId}`,
         {
-          method: isEditing ? "PATCH" : "POST",
+          method: "PATCH",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -329,15 +322,11 @@ export default function AdminServicesPage() {
 
       if (!response.ok || !result.success) {
         throw new Error(
-          result.message || "Failed to save service."
+          result.message || "Failed to update service."
         );
       }
 
-      setNotice(
-        isEditing
-          ? "Service updated successfully."
-          : "Service created successfully."
-      );
+      setNotice("Service updated successfully.");
 
       setIsFormOpen(false);
       setEditingId(null);
@@ -479,14 +468,13 @@ export default function AdminServicesPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={openCreateForm}
+        <Link
+          href="/dashboard/admin/services/add"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:opacity-90"
         >
           <Plus className="h-5 w-5" />
           Add New Service
-        </button>
+        </Link>
       </div>
 
       {notice && (
@@ -640,14 +628,13 @@ export default function AdminServicesPage() {
             </p>
 
             {!search && status === "all" && (
-              <button
-                type="button"
-                onClick={openCreateForm}
+              <Link
+                href="/dashboard/admin/services/add"
                 className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground"
               >
                 <Plus className="h-4 w-4" />
                 Add Service
-              </button>
+              </Link>
             )}
           </div>
         ) : (
@@ -839,7 +826,7 @@ export default function AdminServicesPage() {
                   id="service-form-title"
                   className="text-xl font-extrabold text-foreground"
                 >
-                  {editingId ? "Edit Service" : "Add New Service"}
+                  Edit Service
                 </h2>
 
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -1076,11 +1063,7 @@ export default function AdminServicesPage() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                   )}
 
-                  {saving
-                    ? "Saving..."
-                    : editingId
-                      ? "Update Service"
-                      : "Create Service"}
+                  {saving ? "Saving..." : "Update Service"}
                 </button>
               </div>
             </form>

@@ -246,10 +246,7 @@ export default function AddServicePage() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-primary">
-            ADMIN DASHBOARD
-          </p>
-
+          
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
             Add New Service
           </h1>
