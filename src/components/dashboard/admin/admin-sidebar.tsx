@@ -4,11 +4,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  CalendarDays,
   LayoutDashboard,
-  Menu,
   Scissors,
+  PlusCircle,
+  CalendarDays,
+  Users,
+  CreditCard,
   UserRound,
+  Menu,
 } from "lucide-react";
 
 import {
@@ -21,20 +24,59 @@ import {
 const navItems = [
   {
     name: "Overview",
-    href: "/dashboard",
+    href: "/dashboard/admin",
     icon: LayoutDashboard,
   },
   {
-    name: "My Appointments",
-    href: "/dashboard/appointments",
+    name: "Manage Services",
+    href: "/dashboard/admin/services",
+    icon: Scissors,
+  },
+  {
+    name: "Add/Update Service",
+    href: "/dashboard/admin/services/add",
+    icon: PlusCircle,
+  },
+  {
+    name: "Manage Appointments",
+    href: "/dashboard/admin/appointments",
     icon: CalendarDays,
   },
   {
+    name: "Manage Users",
+    href: "/dashboard/admin/users",
+    icon: Users,
+  },
+  {
+    name: "Transactions",
+    href: "/dashboard/admin/transactions",
+    icon: CreditCard,
+  },
+  {
     name: "My Profile",
-    href: "/dashboard/profile",
+    href: "/dashboard/admin/profile",
     icon: UserRound,
   },
 ];
+
+function isActiveItem(pathname: string, href: string) {
+  if (href === "/dashboard/admin") {
+    return pathname === href;
+  }
+
+  if (href === "/dashboard/admin/services") {
+    return pathname === href;
+  }
+
+  if (href === "/dashboard/admin/services/add") {
+    return (
+      pathname === href ||
+      /^\/dashboard\/admin\/services\/[^/]+\/edit$/.test(pathname)
+    );
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 function SidebarContent({
   pathname,
@@ -54,8 +96,9 @@ function SidebarContent({
           <h2 className="text-xl font-bold tracking-tight text-foreground">
             Salon<span className="text-orange-500">Book</span>
           </h2>
+
           <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
-            Customer Portal
+            Admin Portal
           </p>
         </div>
       </div>
@@ -66,14 +109,10 @@ function SidebarContent({
         </p>
       </div>
 
-      <nav className="flex-1 space-y-2 px-4">
+      <nav className="flex-1 space-y-2 overflow-y-auto px-4">
         {navItems.map((item) => {
           const Icon = item.icon;
-
-          const active =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
+          const active = isActiveItem(pathname, item.href);
 
           const link = (
             <Link
@@ -85,8 +124,8 @@ function SidebarContent({
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
-              <Icon className="h-5 w-5" />
-              {item.name}
+              <Icon className="h-5 w-5 shrink-0" />
+              <span>{item.name}</span>
             </Link>
           );
 
@@ -104,15 +143,16 @@ function SidebarContent({
         <p className="text-sm font-semibold text-foreground">
           SalonBook
         </p>
+
         <p className="mt-1 text-xs text-muted-foreground">
-          Beauty & Wellness
+          Admin Management Portal
         </p>
       </div>
     </div>
   );
 }
 
-export default function CustomerSidebar() {
+export default function AdminSidebar() {
   const pathname = usePathname();
 
   return (
@@ -124,7 +164,7 @@ export default function CustomerSidebar() {
       <div className="lg:hidden">
         <Sheet>
           <SheetTrigger
-            aria-label="Open dashboard navigation"
+            aria-label="Open admin navigation"
             className="fixed left-4 top-4 z-[60] flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background text-foreground shadow-sm"
           >
             <Menu className="h-5 w-5" />
