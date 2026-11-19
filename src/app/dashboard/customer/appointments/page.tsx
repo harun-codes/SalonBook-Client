@@ -239,10 +239,7 @@ export default function MyAppointmentsPage() {
 
     return (
         <div>
-            <p className="text-sm font-semibold text-primary">
-                CUSTOMER DASHBOARD
-            </p>
-
+           
             <div className="mt-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-foreground">

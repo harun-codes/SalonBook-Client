@@ -16,6 +16,7 @@ import {
     ClipboardList,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 export interface Service {
     _id: string;
@@ -60,18 +61,26 @@ export default function ServiceDetails({
 }: {
     service: Service;
 }) {
+    const router = useRouter();
+
     const { data: session, isPending } = authClient.useSession();
 
     const [appointmentDate, setAppointmentDate] = useState("");
     const [timeSlot, setTimeSlot] = useState("");
     const [message, setMessage] = useState("");
 
+    const [showBookingForm, setShowBookingForm] = useState(false);
+
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
-    const [successMessage, setSuccessMessage] = useState("");
-    const [appointmentId, setAppointmentId] = useState("");
 
     const isActive = service.status?.toLowerCase() === "active";
+
+    const userRole = (
+        session?.user as { role?: string } | undefined
+    )?.role;
+
+    const isCustomer = userRole === "customer";
 
     const handleBooking = async (
         e: FormEvent<HTMLFormElement>
@@ -79,21 +88,53 @@ export default function ServiceDetails({
         e.preventDefault();
 
         setErrorMessage("");
-        setSuccessMessage("");
-        setAppointmentId("");
+
+        if (!session?.user || userRole !== "customer") {
+            setErrorMessage(
+                "Only customer accounts can submit appointment requests."
+            );
+            return;
+        }
+
+        if (!isActive) {
+            setErrorMessage(
+                "This service is currently unavailable for booking."
+            );
+            return;
+        }
 
         if (!appointmentDate || !timeSlot) {
-            setErrorMessage("Please select an appointment date and time.");
+            setErrorMessage(
+                "Please select an appointment date and time."
+            );
+            return;
+        }
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)) {
+            setErrorMessage(
+                "Please select a valid appointment date."
+            );
             return;
         }
 
         if (appointmentDate < getDhakaToday()) {
-            setErrorMessage("Appointment date cannot be in the past.");
+            setErrorMessage(
+                "Appointment date cannot be in the past."
+            );
             return;
         }
 
-        if (message.length > 500) {
-            setErrorMessage("Message must not exceed 500 characters.");
+        if (!TIME_SLOTS.includes(timeSlot)) {
+            setErrorMessage(
+                "Please select a valid time slot."
+            );
+            return;
+        }
+
+        if (message.trim().length > 500) {
+            setErrorMessage(
+                "Message must not exceed 500 characters."
+            );
             return;
         }
 
@@ -105,44 +146,61 @@ export default function ServiceDetails({
 
             if (tokenError || !tokenData?.token) {
                 throw new Error(
-                    tokenError?.message || "Please sign in to book an appointment."
+                    tokenError?.message ||
+                    "Your session has expired. Please sign in again."
                 );
             }
 
-            const apiUrl =
-                process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+            const apiUrl = (
+                process.env.NEXT_PUBLIC_API_URL ||
+                "http://localhost:5000"
+            ).replace(/\/$/, "");
 
-            const response = await fetch(`${apiUrl}/appointments`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${tokenData.token}`,
-                },
-                body: JSON.stringify({
-                    serviceId: service._id,
-                    appointmentDate,
-                    timeSlot,
-                    message: message.trim(),
-                }),
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    result.message || "Failed to create appointment."
-                );
-            }
-
-            setSuccessMessage(
-                result.message || "Appointment request submitted successfully."
+            const response = await fetch(
+                `${apiUrl}/appointments`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${tokenData.token}`,
+                    },
+                    body: JSON.stringify({
+                        serviceId: service._id,
+                        appointmentDate,
+                        timeSlot,
+                        message: message.trim(),
+                    }),
+                }
             );
 
-            setAppointmentId(result.appointment?._id || "");
+            const result = (await response.json().catch(() => null)) as {
+                success?: boolean;
+                message?: string;
+                appointment?: {
+                    _id?: string;
+                };
+            } | null;
+
+            if (!response.ok) {
+                const fallbackMessage =
+                    response.status === 409
+                        ? "This time slot is already booked. Please select another time slot."
+                        : response.status === 401
+                            ? "Your session has expired. Please sign in again."
+                            : response.status === 403
+                                ? "Only customer accounts can submit appointments."
+                                : "Failed to create appointment. Please try again.";
+
+                throw new Error(
+                    result?.message || fallbackMessage
+                );
+            }
 
             setAppointmentDate("");
             setTimeSlot("");
             setMessage("");
+
+            router.push("/dashboard/customer/appointments");
 
         } catch (error) {
             console.error("Appointment booking error:", error);
@@ -257,17 +315,22 @@ export default function ServiceDetails({
                             </div>
 
                             {!isActive ? (
+
                                 <div className="mt-6 rounded-xl bg-muted p-4">
                                     <p className="text-sm font-semibold text-muted-foreground">
                                         This service is currently unavailable for booking.
                                     </p>
                                 </div>
+
                             ) : isPending ? (
+
                                 <div className="mt-6 flex items-center justify-center gap-2 rounded-xl bg-muted p-6 text-sm text-muted-foreground">
                                     <Loader2 className="h-5 w-5 animate-spin" />
                                     Checking your account...
                                 </div>
+
                             ) : !session?.user ? (
+
                                 <div className="mt-6">
 
                                     <div className="mb-5 flex items-start gap-3 rounded-xl bg-secondary p-4">
@@ -287,42 +350,66 @@ export default function ServiceDetails({
                                     </Link>
 
                                 </div>
+
+                            ) : !isCustomer ? (
+
+                                <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+                                    <div className="flex items-start gap-3">
+                                        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
+
+                                        <p className="text-sm leading-6 text-amber-800 dark:text-amber-300">
+                                            Only customer accounts can submit appointment requests. Admin accounts cannot book salon services.
+                                        </p>
+                                    </div>
+                                </div>
+
+                            ) : !showBookingForm ? (
+
+                                <div className="mt-6 space-y-4">
+
+                                    <p className="text-sm leading-6 text-muted-foreground">
+                                        Ready to book this service? Select your preferred date and time to request an appointment.
+                                    </p>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setErrorMessage("");
+                                            setShowBookingForm(true);
+                                        }}
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 font-bold text-primary-foreground transition-colors hover:opacity-90"
+                                    >
+                                        Book Appointment
+                                        <ArrowRight className="h-5 w-5" />
+                                    </button>
+
+                                </div>
+
                             ) : (
+
                                 <form
                                     onSubmit={handleBooking}
                                     className="mt-6 space-y-5"
                                 >
 
-                                    {successMessage && (
-                                        <div
-                                            role="status"
-                                            className="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950"
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="font-bold">
+                                            Complete Your Booking
+                                        </h4>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowBookingForm(false);
+                                                setErrorMessage("");
+                                            }}
+                                            disabled={loading}
+                                            className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-primary disabled:opacity-50"
                                         >
-                                            <div className="flex items-start gap-3">
-                                                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700 dark:text-green-400" />
-
-                                                <div>
-                                                    <p className="text-sm font-semibold text-green-800 dark:text-green-300">
-                                                        {successMessage}
-                                                    </p>
-
-                                                    {appointmentId && (
-                                                        <p className="mt-2 break-all text-xs text-green-700 dark:text-green-400">
-                                                            Appointment ID: {appointmentId}
-                                                        </p>
-                                                    )}
-
-                                                    <Link
-                                                        href="/dashboard/appointments"
-                                                        className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-green-800 hover:underline dark:text-green-300"
-                                                    >
-                                                        View My Appointments
-                                                        <ArrowRight className="h-4 w-4" />
-                                                    </Link>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
+                                            <ArrowLeft className="h-4 w-4" />
+                                            Back
+                                        </button>
+                                    </div>
 
                                     {errorMessage && (
                                         <div
@@ -351,7 +438,8 @@ export default function ServiceDetails({
                                                 setErrorMessage("");
                                             }}
                                             required
-                                            className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                            disabled={loading}
+                                            className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
                                         />
                                     </div>
 
@@ -371,7 +459,8 @@ export default function ServiceDetails({
                                                 setErrorMessage("");
                                             }}
                                             required
-                                            className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                            disabled={loading}
+                                            className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
                                         >
                                             <option value="">
                                                 Select a time slot
@@ -402,11 +491,15 @@ export default function ServiceDetails({
                                         <textarea
                                             id="message"
                                             value={message}
-                                            onChange={(e) => setMessage(e.target.value)}
+                                            onChange={(e) => {
+                                                setMessage(e.target.value);
+                                                setErrorMessage("");
+                                            }}
                                             maxLength={500}
                                             rows={3}
+                                            disabled={loading}
                                             placeholder="Write any special requests..."
-                                            className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                            className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
                                         />
                                     </div>
 
@@ -417,6 +510,7 @@ export default function ServiceDetails({
                                             <p className="font-semibold">
                                                 ৳{Number(service.price).toLocaleString("en-BD")}
                                             </p>
+
                                             <p className="text-xs text-muted-foreground">
                                                 Payment status will initially be unpaid.
                                             </p>
@@ -425,7 +519,11 @@ export default function ServiceDetails({
 
                                     <button
                                         type="submit"
-                                        disabled={loading || !appointmentDate || !timeSlot}
+                                        disabled={
+                                            loading ||
+                                            !appointmentDate ||
+                                            !timeSlot
+                                        }
                                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 font-bold text-primary-foreground transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         {loading ? (
@@ -446,6 +544,7 @@ export default function ServiceDetails({
                                     </p>
 
                                 </form>
+
                             )}
 
                         </div>

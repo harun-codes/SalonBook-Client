@@ -311,10 +311,7 @@ export default function CustomerProfilePage() {
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-primary">
-            CUSTOMER DASHBOARD
-          </p>
-
+        
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
             My Profile
           </h1>
