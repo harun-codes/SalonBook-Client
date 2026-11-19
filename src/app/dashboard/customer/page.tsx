@@ -10,9 +10,11 @@ import {
   RefreshCw,
   AlertCircle,
   Loader2,
+  ArrowLeft,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
+import Link from "next/link";
 
 interface Appointment {
   _id: string;
@@ -125,6 +127,14 @@ export default function CustomerDashboardPage() {
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
 
         <div>
+            <Link
+                    href="/"
+                    className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-primary"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Home
+                </Link>
+
           <p className="text-sm font-semibold text-primary">
             CUSTOMER DASHBOARD
           </p>
