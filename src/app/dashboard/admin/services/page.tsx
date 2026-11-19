@@ -470,10 +470,6 @@ export default function AdminServicesPage() {
     <div className="space-y-7">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
         <div>
-          <p className="text-sm font-semibold text-primary">
-            ADMIN DASHBOARD
-          </p>
-
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
             Manage Services
           </h1>
