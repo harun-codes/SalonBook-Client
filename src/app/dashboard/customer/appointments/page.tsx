@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
     CalendarDays,
@@ -14,6 +14,7 @@ import {
     ClipboardList,
     RefreshCw,
     ArrowRight,
+    CreditCard,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
@@ -87,8 +88,13 @@ export default function MyAppointmentsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [actionError, setActionError] = useState("");
+    const [actionSuccess, setActionSuccess] = useState("");
     const [cancellingId, setCancellingId] = useState("");
+    const [payingId, setPayingId] = useState("");
+    const [verifyingPayment, setVerifyingPayment] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+
+    const verifiedSessionRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (sessionLoading) return;
@@ -161,6 +167,170 @@ export default function MyAppointmentsPage() {
         };
     }, [sessionLoading, session?.user, refreshKey]);
 
+    useEffect(() => {
+        if (sessionLoading || !session?.user) return;
+
+        const currentUrl = new URL(window.location.href);
+        const paymentResult = currentUrl.searchParams.get("payment");
+
+        const cleanPaymentUrl = () => {
+            currentUrl.searchParams.delete("payment");
+            currentUrl.searchParams.delete("session_id");
+
+            window.history.replaceState(
+                {},
+                "",
+                `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`
+            );
+        };
+
+        if (paymentResult === "cancelled") {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setActionError("");
+            setActionSuccess(
+                "Payment was cancelled. Your appointment is still unpaid."
+            );
+
+            cleanPaymentUrl();
+            return;
+        }
+
+        if (paymentResult !== "success") return;
+
+        const sessionId = currentUrl.searchParams.get("session_id");
+
+        if (!sessionId) {
+            setActionError(
+                "Payment return received, but checkout session ID was not found."
+            );
+            cleanPaymentUrl();
+            return;
+        }
+
+        if (verifiedSessionRef.current === sessionId) return;
+
+        verifiedSessionRef.current = sessionId;
+
+        const verifyPayment = async () => {
+            try {
+                setVerifyingPayment(true);
+                setActionError("");
+                setActionSuccess("");
+
+                const { data: tokenData, error: tokenError } =
+                    await authClient.token();
+
+                if (tokenError || !tokenData?.token) {
+                    throw new Error(
+                        tokenError?.message || "Authentication failed."
+                    );
+                }
+
+                const apiUrl =
+                    process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+                const response = await fetch(
+                    `${apiUrl}/payments/checkout-verify`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${tokenData.token}`,
+                        },
+                        body: JSON.stringify({
+                            sessionId,
+                        }),
+                    }
+                );
+
+                const result = await response.json();
+
+                const alreadyVerified =
+                    /already verified|already paid/i.test(
+                        result.message || ""
+                    );
+
+                if ((!response.ok || !result.success) && !alreadyVerified) {
+                    throw new Error(
+                        result.message || "Payment verification failed."
+                    );
+                }
+
+                setActionSuccess(
+                    alreadyVerified
+                        ? "Your payment has already been verified."
+                        : "Payment completed successfully!"
+                );
+
+                setRefreshKey((previous) => previous + 1);
+
+                cleanPaymentUrl();
+            } catch (err) {
+                console.error("Payment verification error:", err);
+
+                setActionError(
+                    err instanceof Error
+                        ? err.message
+                        : "Unable to verify payment."
+                );
+            } finally {
+                setVerifyingPayment(false);
+            }
+        };
+
+        verifyPayment();
+    }, [sessionLoading, session?.user]);
+
+    const handlePayment = async (appointmentId: string) => {
+        try {
+            setPayingId(appointmentId);
+            setActionError("");
+            setActionSuccess("");
+
+            const { data: tokenData, error: tokenError } =
+                await authClient.token();
+
+            if (tokenError || !tokenData?.token) {
+                throw new Error(
+                    tokenError?.message || "Authentication failed."
+                );
+            }
+
+            const apiUrl =
+                process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+            const response = await fetch(
+                `${apiUrl}/appointments/${encodeURIComponent(appointmentId)}/create-checkout-session`,
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${tokenData.token}`,
+                    },
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success || !result.checkoutUrl) {
+                throw new Error(
+                    result.message || "Unable to create checkout session."
+                );
+            }
+
+            window.location.assign(result.checkoutUrl);
+        } catch (err) {
+            console.error("Create checkout session error:", err);
+
+            setActionError(
+                err instanceof Error
+                    ? err.message
+                    : "Unable to proceed with payment."
+            );
+
+            setPayingId("");
+        }
+    };
+
     const handleCancel = async (appointmentId: string) => {
         const confirmed = window.confirm(
             "Are you sure you want to cancel this appointment?"
@@ -171,6 +341,7 @@ export default function MyAppointmentsPage() {
         try {
             setCancellingId(appointmentId);
             setActionError("");
+            setActionSuccess("");
 
             const { data: tokenData, error: tokenError } =
                 await authClient.token();
@@ -206,12 +377,14 @@ export default function MyAppointmentsPage() {
                 previous.map((appointment) =>
                     appointment._id === appointmentId
                         ? {
-                            ...appointment,
-                            status: result.appointment?.status || "cancelled",
-                        }
+                              ...appointment,
+                              status: result.appointment?.status || "cancelled",
+                          }
                         : appointment
                 )
             );
+
+            setActionSuccess("Appointment cancelled successfully.");
         } catch (err) {
             console.error("Cancel appointment error:", err);
 
@@ -239,7 +412,6 @@ export default function MyAppointmentsPage() {
 
     return (
         <div>
-           
             <div className="mt-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-foreground">
@@ -262,6 +434,27 @@ export default function MyAppointmentsPage() {
                     Refresh
                 </button>
             </div>
+
+            {actionSuccess && (
+                <div className="mt-6 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-300">
+                    <CheckCircle2 className="h-5 w-5 shrink-0" />
+                    {actionSuccess}
+                </div>
+            )}
+
+            {actionError && (
+                <div className="mt-6 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+                    <AlertCircle className="h-5 w-5 shrink-0" />
+                    {actionError}
+                </div>
+            )}
+
+            {verifyingPayment && (
+                <div className="mt-6 flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-sm font-medium text-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    Verifying your payment. Please wait...
+                </div>
+            )}
 
             {!loading && !error && (
                 <div className="mt-7 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -300,13 +493,6 @@ export default function MyAppointmentsPage() {
                             {cancelledCount}
                         </h2>
                     </div>
-                </div>
-            )}
-
-            {actionError && (
-                <div className="mt-6 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-                    <AlertCircle className="h-5 w-5 shrink-0" />
-                    {actionError}
                 </div>
             )}
 
@@ -365,14 +551,11 @@ export default function MyAppointmentsPage() {
             ) : (
                 <div className="mt-8 space-y-5">
                     {appointments.map((appointment) => (
-
-
                         <article
                             key={appointment._id}
                             className="rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5"
                         >
                             <div className="flex items-start gap-4">
-
                                 <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-muted sm:h-32 sm:w-32">
                                     {appointment.service?.image ? (
                                         <img
@@ -388,7 +571,6 @@ export default function MyAppointmentsPage() {
                                 </div>
 
                                 <div className="min-w-0 flex-1">
-
                                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                         <div className="min-w-0">
                                             <p className="text-xs font-semibold uppercase tracking-wider text-primary">
@@ -410,7 +592,6 @@ export default function MyAppointmentsPage() {
                                     </div>
 
                                     <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 xl:grid-cols-4">
-
                                         <div>
                                             <p className="text-xs text-muted-foreground">
                                                 Appointment Date
@@ -458,7 +639,6 @@ export default function MyAppointmentsPage() {
                                                 </p>
                                             </div>
                                         </div>
-
                                     </div>
 
                                     {appointment.message && (
@@ -469,43 +649,70 @@ export default function MyAppointmentsPage() {
                                     )}
 
                                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-
                                         <p className="min-w-0 truncate text-xs text-muted-foreground">
                                             Booking ID: {appointment._id}
                                         </p>
 
-                                        {appointment.status.toLowerCase() === "pending" && (
-                                            <button
-                                                onClick={() => handleCancel(appointment._id)}
-                                                disabled={cancellingId === appointment._id}
-                                                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
-                                            >
-                                                {cancellingId === appointment._id ? (
-                                                    <>
-                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                        Cancelling...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <XCircle className="h-4 w-4" />
-                                                        Cancel
-                                                    </>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {appointment.status.toLowerCase() === "confirmed" &&
+                                                appointment.paymentStatus.toLowerCase() === "unpaid" && (
+                                                    <button
+                                                        onClick={() => handlePayment(appointment._id)}
+                                                        disabled={Boolean(payingId) || verifyingPayment}
+                                                        className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        {payingId === appointment._id ? (
+                                                            <>
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                                Redirecting...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <CreditCard className="h-4 w-4" />
+                                                                Pay Now
+                                                            </>
+                                                        )}
+                                                    </button>
                                                 )}
-                                            </button>
-                                        )}
 
-                                        {appointment.status.toLowerCase() === "cancelled" && (
-                                            <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-red-600 dark:text-red-400">
-                                                <XCircle className="h-4 w-4" />
-                                                Cancelled
-                                            </span>
-                                        )}
+                                            {appointment.status.toLowerCase() === "pending" && (
+                                                <button
+                                                    onClick={() => handleCancel(appointment._id)}
+                                                    disabled={cancellingId === appointment._id}
+                                                    className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                                                >
+                                                    {cancellingId === appointment._id ? (
+                                                        <>
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                            Cancelling...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <XCircle className="h-4 w-4" />
+                                                            Cancel
+                                                        </>
+                                                    )}
+                                                </button>
+                                            )}
 
+                                            {appointment.status.toLowerCase() === "cancelled" && (
+                                                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-red-600 dark:text-red-400">
+                                                    <XCircle className="h-4 w-4" />
+                                                    Cancelled
+                                                </span>
+                                            )}
+
+                                            {appointment.paymentStatus.toLowerCase() === "paid" && (
+                                                <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-green-100 px-3 py-2 text-xs font-semibold text-green-700 dark:bg-green-950 dark:text-green-300">
+                                                    <CheckCircle2 className="h-4 w-4" />
+                                                    Payment Completed
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </article>
-
                     ))}
                 </div>
             )}
