@@ -10,6 +10,7 @@ import {
 
 import type { ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { uploadImage } from "@/lib/upload-image";
 
 import {
   User,
@@ -21,12 +22,12 @@ import {
   Save,
   Loader2,
   AlertCircle,
-  CheckCircle2,
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 interface Profile {
   name: string;
@@ -40,11 +41,6 @@ interface Profile {
 interface ProfileResponse {
   success: boolean;
   user?: Partial<Profile>;
-  message?: string;
-}
-
-interface UploadResponse {
-  url?: string;
   message?: string;
 }
 
@@ -90,14 +86,9 @@ export default function AdminProfilePage() {
 
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const fetchProfile = useCallback(async () => {
+  const fetchProfile = useCallback(async (showSuccessToast = false) => {
     try {
       setLoading(true);
-      setError("");
-      setSuccess("");
       setProfileLoaded(false);
 
       const token = await getAuthToken();
@@ -130,12 +121,20 @@ export default function AdminProfilePage() {
       setProfile(loadedProfile);
       setSavedProfile(loadedProfile);
       setProfileLoaded(true);
+
+      if (showSuccessToast) {
+        toast.success("Profile Refreshed", {
+          description:
+            "Your admin profile information has been loaded successfully.",
+        });
+      }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong."
-      );
+      toast.error("Unable to Load Admin Profile", {
+        description:
+          err instanceof Error
+            ? err.message
+            : "Something went wrong.",
+      });
     } finally {
       setLoading(false);
     }
@@ -149,12 +148,10 @@ export default function AdminProfilePage() {
   const handleImageUpload = async (
     event: ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
 
     if (!file) return;
-
-    setError("");
-    setSuccess("");
 
     const allowedTypes = [
       "image/jpeg",
@@ -163,42 +160,33 @@ export default function AdminProfilePage() {
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      setError("Please select a JPG, PNG or WEBP image.");
-      event.target.value = "";
+      toast.error("Invalid Image Format", {
+        description: "Please select a JPG, PNG or WEBP image.",
+      });
+
+      input.value = "";
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image size must be less than 5MB.");
-      event.target.value = "";
+    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+      toast.error("Invalid Image Size", {
+        description:
+          "Image size must be greater than 0 and less than 5MB.",
+      });
+
+      input.value = "";
       return;
     }
 
     try {
       setUploading(true);
 
-      const formData = new FormData();
-      formData.append("image", file);
+      const uploadedUrl = await uploadImage(file, "profile");
 
-      const response = await fetch("/api/upload-image", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result: UploadResponse = await response.json();
-
-      if (!response.ok || !result.url) {
-        throw new Error(
-          result.message || "Image upload failed."
-        );
-      }
-
-      const uploadedUrl = result.url.trim();
       const imageUrl = new URL(uploadedUrl);
 
       if (
         imageUrl.protocol !== "https:" ||
-        !imageUrl.hostname ||
         imageUrl.username ||
         imageUrl.password
       ) {
@@ -210,18 +198,20 @@ export default function AdminProfilePage() {
         image: uploadedUrl,
       }));
 
-      setSuccess(
-        "Image uploaded. Save changes to update your profile."
-      );
+      toast.success("Image Uploaded Successfully", {
+        description:
+          "Save changes to update your admin profile photo.",
+      });
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to upload image."
-      );
+      toast.error("Image Upload Failed", {
+        description:
+          err instanceof Error
+            ? err.message
+            : "Failed to upload image.",
+      });
     } finally {
       setUploading(false);
-      event.target.value = "";
+      input.value = "";
     }
   };
 
@@ -231,11 +221,9 @@ export default function AdminProfilePage() {
       image: "",
     }));
 
-    setSuccess(
-      "Image removed. Save changes to confirm."
-    );
-
-    setError("");
+    toast.info("Profile Image Removed", {
+      description: "Save changes to confirm this update.",
+    });
   };
 
   const handleSave = async (
@@ -243,11 +231,10 @@ export default function AdminProfilePage() {
   ) => {
     event.preventDefault();
 
-    setError("");
-    setSuccess("");
-
     if (!savedProfile) {
-      setError("Profile information is not available.");
+      toast.error("Profile Unavailable", {
+        description: "Profile information is not available.",
+      });
       return;
     }
 
@@ -255,7 +242,9 @@ export default function AdminProfilePage() {
     const trimmedPhone = profile.phone.trim();
 
     if (trimmedName.length < 2 || trimmedName.length > 60) {
-      setError("Name must contain 2-60 characters.");
+      toast.error("Invalid Name", {
+        description: "Name must contain 2-60 characters.",
+      });
       return;
     }
 
@@ -263,7 +252,9 @@ export default function AdminProfilePage() {
       trimmedPhone &&
       !/^[+()\d\s-]{7,20}$/.test(trimmedPhone)
     ) {
-      setError("Please enter a valid phone number.");
+      toast.error("Invalid Phone Number", {
+        description: "Please enter a valid phone number.",
+      });
       return;
     }
 
@@ -282,7 +273,9 @@ export default function AdminProfilePage() {
     }
 
     if (Object.keys(updates).length === 0) {
-      setSuccess("No changes to save.");
+      toast.info("No Changes to Save", {
+        description: "Your admin profile is already up to date.",
+      });
       return;
     }
 
@@ -364,15 +357,17 @@ export default function AdminProfilePage() {
 
       router.refresh();
 
-      setSuccess(
-        "Your admin profile has been updated successfully."
-      );
+      toast.success("Profile Updated Successfully", {
+        description:
+          "Your admin profile has been updated successfully.",
+      });
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong."
-      );
+      toast.error("Profile Update Failed", {
+        description:
+          err instanceof Error
+            ? err.message
+            : "Something went wrong.",
+      });
     } finally {
       setSaving(false);
     }
@@ -382,7 +377,6 @@ export default function AdminProfilePage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
             My Profile
           </h1>
@@ -394,7 +388,7 @@ export default function AdminProfilePage() {
 
         <button
           type="button"
-          onClick={fetchProfile}
+          onClick={() => fetchProfile(true)}
           disabled={loading || saving || uploading}
           className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
         >
@@ -406,26 +400,6 @@ export default function AdminProfilePage() {
           Refresh
         </button>
       </div>
-
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400"
-        >
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div
-          role="status"
-          className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/30 dark:text-green-400"
-        >
-          <CheckCircle2 className="h-5 w-5 shrink-0" />
-          {success}
-        </div>
-      )}
 
       {loading ? (
         <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-border bg-card">
@@ -451,7 +425,7 @@ export default function AdminProfilePage() {
 
           <button
             type="button"
-            onClick={fetchProfile}
+            onClick={() => fetchProfile(true)}
             disabled={loading}
             className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
@@ -668,7 +642,7 @@ export default function AdminProfilePage() {
           <div className="mt-8 flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end">
             <button
               type="button"
-              onClick={fetchProfile}
+              onClick={() => fetchProfile(true)}
               disabled={saving || uploading || loading}
               className="rounded-xl border border-border px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
             >

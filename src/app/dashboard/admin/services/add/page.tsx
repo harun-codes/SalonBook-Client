@@ -1,10 +1,8 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import {
   ArrowLeft,
@@ -37,6 +35,17 @@ const CATEGORIES = [
   "Spa & Massage",
 ];
 
+type ToastType = "success" | "error";
+
+interface ToastState {
+  type: ToastType;
+  message: string;
+  action?: {
+    label: string;
+    href: string;
+  };
+}
+
 interface ServiceForm {
   serviceName: string;
   category: string;
@@ -64,14 +73,30 @@ const INITIAL_FORM: ServiceForm = {
 };
 
 export default function AddServicePage() {
-  const router = useRouter();
-
   const [form, setForm] = useState<ServiceForm>(INITIAL_FORM);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  const showToast = (
+    type: ToastType,
+    message: string,
+    action?: ToastState["action"]
+  ) => {
+    setToast({ type, message, action });
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+
+    const timeout = setTimeout(() => {
+      setToast(null);
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [toast]);
 
   const imagePreview = useMemo(
     () => imageFile ? URL.createObjectURL(imageFile) : "",
@@ -97,9 +122,6 @@ export default function AddServicePage() {
       ...prev,
       [name]: value,
     }));
-
-    setError("");
-    setSuccess("");
   };
 
   const handleImageChange = (
@@ -116,27 +138,26 @@ export default function AddServicePage() {
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      setError("Please select a JPG, PNG or WEBP image.");
+      showToast("error", "Please select a JPG, PNG or WEBP image.");
       event.target.value = "";
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image size must be less than 5MB.");
+    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+      showToast(
+        "error",
+        "Image size must be greater than 0 and less than 5MB."
+      );
       event.target.value = "";
       return;
     }
 
     setImageFile(file);
-    setError("");
-    setSuccess("");
     event.target.value = "";
   };
 
   const handleRemoveImage = () => {
     setImageFile(null);
-    setError("");
-    setSuccess("");
   };
 
   const handleSubmit = async (
@@ -144,31 +165,28 @@ export default function AddServicePage() {
   ) => {
     event.preventDefault();
 
-    setError("");
-    setSuccess("");
-
     const serviceName = form.serviceName.trim();
     const description = form.description.trim();
     const price = Number(form.price);
     const duration = Number(form.duration);
 
     if (!serviceName) {
-      setError("Please enter a service name.");
+      showToast("error", "Please enter a service name.");
       return;
     }
 
     if (!form.category) {
-      setError("Please select a service category.");
+      showToast("error", "Please select a service category.");
       return;
     }
 
     if (!description) {
-      setError("Please enter a service description.");
+      showToast("error", "Please enter a service description.");
       return;
     }
 
     if (!form.price || !Number.isFinite(price) || price <= 0) {
-      setError("Price must be a positive number.");
+      showToast("error", "Price must be a positive number.");
       return;
     }
 
@@ -177,12 +195,12 @@ export default function AddServicePage() {
       !Number.isInteger(duration) ||
       duration <= 0
     ) {
-      setError("Duration must be a positive whole number.");
+      showToast("error", "Duration must be a positive whole number.");
       return;
     }
 
     if (!imageFile) {
-      setError("Please upload a service image.");
+      showToast("error", "Please upload a service image.");
       return;
     }
 
@@ -197,7 +215,11 @@ export default function AddServicePage() {
         );
       }
 
+      setUploadingImage(true);
+
       const imageUrl = await uploadServiceImage(imageFile);
+
+      setUploadingImage(false);
 
       const response = await fetch(`${API_URL}/admin/services`, {
         method: "POST",
@@ -224,29 +246,75 @@ export default function AddServicePage() {
         );
       }
 
-      setSuccess(
-        result.message || "Service created successfully."
+      showToast(
+        "success",
+        result.message || "Service created successfully.",
+        {
+          label: "View Services",
+          href: "/dashboard/admin/services",
+        }
       );
 
       setForm(INITIAL_FORM);
       setImageFile(null);
     } catch (err) {
-      setError(
+      showToast(
+        "error",
         err instanceof Error
           ? err.message
           : "Something went wrong while creating the service."
       );
     } finally {
+      setUploadingImage(false);
       setLoading(false);
     }
   };
 
   return (
     <div className="mx-auto max-w-4xl space-y-7">
+      {toast && (
+        <div
+          role={toast.type === "error" ? "alert" : "status"}
+          aria-live={toast.type === "error" ? "assertive" : "polite"}
+          className={`fixed right-4 top-4 z-[200] flex w-[calc(100%-2rem)] max-w-md items-start gap-3 rounded-2xl border p-4 shadow-2xl ${
+            toast.type === "success"
+              ? "border-emerald-200 bg-white text-emerald-800 dark:border-emerald-900 dark:bg-card dark:text-emerald-400"
+              : "border-red-200 bg-white text-red-700 dark:border-red-900 dark:bg-card dark:text-red-400"
+          }`}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+          ) : (
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          )}
+
+          <p className="flex-1 text-sm font-medium leading-6">
+            {toast.message}
+          </p>
+
+          {toast.action && (
+            <Link
+              href={toast.action.href}
+              onClick={() => setToast(null)}
+              className="shrink-0 text-sm font-bold underline underline-offset-4"
+            >
+              {toast.action.label}
+            </Link>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Dismiss notification"
+            className="shrink-0 rounded-lg p-1 opacity-70 transition-opacity hover:opacity-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
             Add New Service
           </h1>
@@ -264,35 +332,6 @@ export default function AddServicePage() {
           Back to Services
         </Link>
       </div>
-
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400"
-        >
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div
-          role="status"
-          className="flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/30 dark:text-green-400 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 shrink-0" />
-            {success}
-          </div>
-
-          <Link
-            href="/dashboard/admin/services"
-            className="font-semibold underline"
-          >
-            View Services
-          </Link>
-        </div>
-      )}
 
       <form
         onSubmit={handleSubmit}
@@ -315,7 +354,6 @@ export default function AddServicePage() {
         </div>
 
         <div className="space-y-6">
-
           <div>
             <label
               htmlFor="serviceName"
@@ -397,7 +435,6 @@ export default function AddServicePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-
             <div>
               <label
                 htmlFor="price"
@@ -461,7 +498,6 @@ export default function AddServicePage() {
                 Duration in minutes. Must be a positive whole number.
               </p>
             </div>
-
           </div>
 
           <div>
@@ -471,10 +507,8 @@ export default function AddServicePage() {
             </label>
 
             <div className="rounded-xl border border-dashed border-border bg-background p-4 sm:p-5">
-
               {imagePreview ? (
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-
                   <div className="relative h-36 w-full overflow-hidden rounded-xl border border-border bg-muted sm:h-32 sm:w-44">
                     <img
                       src={imagePreview}
@@ -506,7 +540,6 @@ export default function AddServicePage() {
                       Remove Image
                     </button>
                   </div>
-
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-7 text-center">
@@ -546,7 +579,6 @@ export default function AddServicePage() {
               <p className="mt-4 border-t border-border pt-3 text-center text-xs text-muted-foreground">
                 JPG, PNG or WEBP · Maximum file size 5MB · Uploaded via ImgBB
               </p>
-
             </div>
           </div>
 
@@ -574,11 +606,9 @@ export default function AddServicePage() {
               New services are active by default and available for booking.
             </p>
           </div>
-
         </div>
 
         <div className="mt-8 flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:justify-end">
-
           <Link
             href="/dashboard/admin/services"
             className="inline-flex items-center justify-center rounded-xl border border-border px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
@@ -594,7 +624,7 @@ export default function AddServicePage() {
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Creating Service...
+                {uploadingImage ? "Uploading Image..." : "Creating Service..."}
               </>
             ) : (
               <>
@@ -603,7 +633,6 @@ export default function AddServicePage() {
               </>
             )}
           </button>
-
         </div>
       </form>
     </div>

@@ -2,6 +2,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import { SearchX } from "lucide-react";
 import ServiceFilters from "./service-filters";
 import ServiceCard from "./service-card";
@@ -14,10 +19,17 @@ interface ServicesListProps {
 export default function ServicesList({
   services,
 }: ServicesListProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
+
   const [sortOrder, setSortOrder] =
     useState<ServiceSortOption>("default");
+
+  const selectedCategory =
+    searchParams.get("category") || "all";
 
   const categories = useMemo(() => {
     return Array.from(
@@ -29,6 +41,25 @@ export default function ServicesList({
     ).sort((a, b) => a.localeCompare(b));
   }, [services]);
 
+  const handleCategoryChange = (value: string) => {
+    const params = new URLSearchParams(
+      searchParams.toString()
+    );
+
+    if (value === "all") {
+      params.delete("category");
+    } else {
+      params.set("category", value);
+    }
+
+    const query = params.toString();
+
+    router.replace(
+      query ? `${pathname}?${query}` : pathname,
+      { scroll: false }
+    );
+  };
+
   const filteredServices = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
 
@@ -39,7 +70,8 @@ export default function ServicesList({
 
       const matchesCategory =
         selectedCategory === "all" ||
-        service.category === selectedCategory;
+        service.category.trim().toLowerCase() ===
+          selectedCategory.trim().toLowerCase();
 
       return matchesSearch && matchesCategory;
     });
@@ -57,8 +89,8 @@ export default function ServicesList({
 
   const clearFilters = () => {
     setSearchTerm("");
-    setSelectedCategory("all");
     setSortOrder("default");
+    handleCategoryChange("all");
   };
 
   const hasActiveFilters =
@@ -68,13 +100,12 @@ export default function ServicesList({
 
   return (
     <section className="space-y-6">
-
       <ServiceFilters
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         categories={categories}
         selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
+        setSelectedCategory={handleCategoryChange}
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
       />
@@ -133,7 +164,6 @@ export default function ServicesList({
           ))}
         </div>
       )}
-
     </section>
   );
 }

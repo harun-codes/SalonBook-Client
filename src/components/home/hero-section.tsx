@@ -5,7 +5,7 @@ import {
   CheckCircle2,
   Sparkles,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+
 
 export function HeroSection() {
   return (
@@ -42,29 +42,22 @@ export function HeroSection() {
           </div>
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-            <Button
-              
-              size="lg"
-              className="h-11 rounded-full bg-[#E8FFF2] px-6 text-sm font-semibold text-[#075E46] hover:bg-white sm:h-12 sm:px-7"
+            <Link
+              href="/services"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-[#E8FFF2] px-6 text-sm font-semibold text-[#075E46] hover:bg-white sm:h-12 sm:px-7"
             >
-              <Link href="/services">
-                Explore Services
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+              Explore Services
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
 
-            <Button
-             
-              size="lg"
-              variant="outline"
-              className="h-11 rounded-full border-white/60 bg-white/10 px-6 text-sm text-white backdrop-blur-sm hover:bg-white/20 hover:text-white sm:h-12 sm:px-7"
+            <Link
+              href="#service-categories"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-white/60 bg-white/10 px-6 text-sm text-white backdrop-blur-sm hover:bg-white/20 sm:h-12 sm:px-7"
             >
-              <Link href="#why-choose-us">
-                Discover More
-              </Link>
-              
-            </Button>
+              Discover More
+            </Link>
           </div>
+
 
           <div className="flex flex-wrap gap-x-5 gap-y-3 pt-3">
             {[

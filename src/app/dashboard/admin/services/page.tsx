@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -27,6 +26,14 @@ import {
 
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { uploadServiceImage } from "@/lib/upload-image";
+
+type ToastType = "success" | "error";
+
+interface ToastState {
+  type: ToastType;
+  message: string;
+}
 
 interface Service {
   _id: string;
@@ -81,23 +88,35 @@ export default function AdminServicesPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ServiceForm>(initialForm);
-  const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
-  const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(
     null
   );
+
+  const showToast = useCallback((type: ToastType, message: string) => {
+    setToast({ type, message });
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+
+    const timeout = setTimeout(() => {
+      setToast(null);
+    }, 4500);
+
+    return () => clearTimeout(timeout);
+  }, [toast]);
 
   const getToken = async () => {
     const { data, error } = await authClient.token();
@@ -172,7 +191,6 @@ export default function AdminServicesPage() {
   const openEditForm = async (id: string) => {
     try {
       setFormLoading(true);
-      setFormError("");
       setEditingId(id);
 
       const token = await getToken();
@@ -209,10 +227,9 @@ export default function AdminServicesPage() {
 
       setIsFormOpen(true);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load service."
+      showToast(
+        "error",
+        err instanceof Error ? err.message : "Failed to load service."
       );
     } finally {
       setFormLoading(false);
@@ -238,45 +255,40 @@ export default function AdminServicesPage() {
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setFormError("Please select a valid image.");
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      showToast("error", "Only JPG, PNG and WEBP images are allowed.");
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setFormError("Image size must be less than 5MB.");
+    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+      showToast(
+        "error",
+        "Image size must be greater than 0 and less than 5MB."
+      );
       return;
     }
 
     try {
       setUploadingImage(true);
-      setFormError("");
 
-      const formData = new FormData();
-      formData.append("image", file);
-
-      const response = await fetch("/api/upload-image", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.url) {
-        throw new Error(
-          result.message || "Image upload failed."
-        );
-      }
+      const imageUrl = await uploadServiceImage(file);
 
       setForm((previous) => ({
         ...previous,
-        image: result.url,
+        image: imageUrl,
       }));
+
+      showToast("success", "Service image uploaded successfully.");
     } catch (err) {
-      setFormError(
-        err instanceof Error
-          ? err.message
-          : "Failed to upload image."
+      showToast(
+        "error",
+        err instanceof Error ? err.message : "Failed to upload image."
       );
     } finally {
       setUploadingImage(false);
@@ -290,9 +302,13 @@ export default function AdminServicesPage() {
 
     if (!editingId) return;
 
+    if (uploadingImage) {
+      showToast("error", "Please wait until the image upload is complete.");
+      return;
+    }
+
     try {
       setSaving(true);
-      setFormError("");
 
       const token = await getToken();
 
@@ -326,18 +342,17 @@ export default function AdminServicesPage() {
         );
       }
 
-      setNotice("Service updated successfully.");
-
       setIsFormOpen(false);
       setEditingId(null);
       setForm(initialForm);
 
+      showToast("success", "Service updated successfully.");
+
       await fetchServices();
     } catch (err) {
-      setFormError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong."
+      showToast(
+        "error",
+        err instanceof Error ? err.message : "Failed to update service."
       );
     } finally {
       setSaving(false);
@@ -352,8 +367,6 @@ export default function AdminServicesPage() {
 
     try {
       setStatusUpdatingId(service._id);
-      setError("");
-      setNotice("");
 
       const token = await getToken();
 
@@ -379,7 +392,8 @@ export default function AdminServicesPage() {
         );
       }
 
-      setNotice(
+      showToast(
+        "success",
         `Service ${
           nextStatus === "active" ? "activated" : "deactivated"
         } successfully.`
@@ -387,7 +401,8 @@ export default function AdminServicesPage() {
 
       await fetchServices();
     } catch (err) {
-      setError(
+      showToast(
+        "error",
         err instanceof Error
           ? err.message
           : "Failed to update service status."
@@ -402,7 +417,6 @@ export default function AdminServicesPage() {
 
     try {
       setDeleting(true);
-      setDeleteError("");
 
       const token = await getToken();
 
@@ -424,15 +438,15 @@ export default function AdminServicesPage() {
         );
       }
 
-      setNotice("Service deleted successfully.");
       setDeleteTarget(null);
+
+      showToast("success", "Service deleted successfully.");
 
       await fetchServices();
     } catch (err) {
-      setDeleteError(
-        err instanceof Error
-          ? err.message
-          : "Failed to delete service."
+      showToast(
+        "error",
+        err instanceof Error ? err.message : "Failed to delete service."
       );
     } finally {
       setDeleting(false);
@@ -445,7 +459,6 @@ export default function AdminServicesPage() {
     setIsFormOpen(false);
     setEditingId(null);
     setForm(initialForm);
-    setFormError("");
   };
 
   const formatPrice = (price: number) =>
@@ -457,6 +470,37 @@ export default function AdminServicesPage() {
 
   return (
     <div className="space-y-7">
+      {toast && (
+        <div
+          role={toast.type === "error" ? "alert" : "status"}
+          aria-live={toast.type === "error" ? "assertive" : "polite"}
+          className={`fixed right-4 top-4 z-[200] flex w-[calc(100%-2rem)] max-w-md items-start gap-3 rounded-2xl border p-4 shadow-2xl ${
+            toast.type === "success"
+              ? "border-emerald-200 bg-white text-emerald-800 dark:border-emerald-900 dark:bg-card dark:text-emerald-400"
+              : "border-red-200 bg-white text-red-700 dark:border-red-900 dark:bg-card dark:text-red-400"
+          }`}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+          ) : (
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          )}
+
+          <p className="flex-1 text-sm font-medium leading-6">
+            {toast.message}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Dismiss notification"
+            className="shrink-0 rounded-lg p-1 opacity-70 transition-opacity hover:opacity-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
         <div>
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
@@ -476,23 +520,6 @@ export default function AdminServicesPage() {
           Add New Service
         </Link>
       </div>
-
-      {notice && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-400">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 shrink-0" />
-            {notice}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setNotice("")}
-            aria-label="Dismiss notification"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -603,10 +630,12 @@ export default function AdminServicesPage() {
                 className="flex animate-pulse items-center gap-4"
               >
                 <div className="h-14 w-14 rounded-xl bg-muted" />
+
                 <div className="flex-1 space-y-2">
                   <div className="h-4 w-1/3 rounded bg-muted" />
                   <div className="h-3 w-1/4 rounded bg-muted" />
                 </div>
+
                 <div className="h-8 w-20 rounded bg-muted" />
               </div>
             ))}
@@ -782,7 +811,6 @@ export default function AdminServicesPage() {
                             type="button"
                             onClick={() => {
                               setDeleteTarget(service);
-                              setDeleteError("");
                             }}
                             disabled={isUpdatingStatus}
                             aria-label={`Delete ${service.serviceName}`}
@@ -805,6 +833,7 @@ export default function AdminServicesPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
           <div className="flex items-center gap-3 rounded-2xl bg-card px-6 py-5 shadow-xl">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
+
             <span className="text-sm font-semibold text-foreground">
               Loading service details...
             </span>
@@ -997,7 +1026,7 @@ export default function AdminServicesPage() {
 
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/webp"
                         className="hidden"
                         disabled={uploadingImage}
                         onChange={handleImageUpload}
@@ -1033,16 +1062,6 @@ export default function AdminServicesPage() {
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
-
-              {formError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400"
-                >
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  {formError}
-                </div>
-              )}
 
               <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
                 <button
@@ -1094,22 +1113,11 @@ export default function AdminServicesPage() {
               ? This action cannot be undone.
             </p>
 
-            {deleteError && (
-              <div
-                role="alert"
-                className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400"
-              >
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                {deleteError}
-              </div>
-            )}
-
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => {
                   setDeleteTarget(null);
-                  setDeleteError("");
                 }}
                 disabled={deleting}
                 className="rounded-xl border border-border px-5 py-3 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"

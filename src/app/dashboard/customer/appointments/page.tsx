@@ -17,6 +17,7 @@ import {
     CreditCard,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 interface AppointmentService {
     serviceName: string;
@@ -87,9 +88,8 @@ export default function MyAppointmentsPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [actionError, setActionError] = useState("");
-    const [actionSuccess, setActionSuccess] = useState("");
     const [cancellingId, setCancellingId] = useState("");
+    const [appointmentToCancel, setAppointmentToCancel] = useState<string | null>(null);
     const [payingId, setPayingId] = useState("");
     const [verifyingPayment, setVerifyingPayment] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -185,11 +185,10 @@ export default function MyAppointmentsPage() {
         };
 
         if (paymentResult === "cancelled") {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setActionError("");
-            setActionSuccess(
-                "Payment was cancelled. Your appointment is still unpaid."
-            );
+            toast.info("Payment Cancelled", {
+                description:
+                    "Your appointment is still unpaid. You can try paying again from this page.",
+            });
 
             cleanPaymentUrl();
             return;
@@ -200,9 +199,11 @@ export default function MyAppointmentsPage() {
         const sessionId = currentUrl.searchParams.get("session_id");
 
         if (!sessionId) {
-            setActionError(
-                "Payment return received, but checkout session ID was not found."
-            );
+            toast.error("Payment Verification Failed", {
+                description:
+                    "The checkout session ID was not found. Please check your appointment payment status.",
+            });
+
             cleanPaymentUrl();
             return;
         }
@@ -214,8 +215,6 @@ export default function MyAppointmentsPage() {
         const verifyPayment = async () => {
             try {
                 setVerifyingPayment(true);
-                setActionError("");
-                setActionSuccess("");
 
                 const { data: tokenData, error: tokenError } =
                     await authClient.token();
@@ -256,10 +255,15 @@ export default function MyAppointmentsPage() {
                     );
                 }
 
-                setActionSuccess(
+                toast.success(
                     alreadyVerified
-                        ? "Your payment has already been verified."
-                        : "Payment completed successfully!"
+                        ? "Payment Already Verified"
+                        : "Payment Completed Successfully",
+                    {
+                        description: alreadyVerified
+                            ? "This appointment's payment was already verified."
+                            : "Your appointment payment status has been updated to paid.",
+                    }
                 );
 
                 setRefreshKey((previous) => previous + 1);
@@ -268,11 +272,12 @@ export default function MyAppointmentsPage() {
             } catch (err) {
                 console.error("Payment verification error:", err);
 
-                setActionError(
-                    err instanceof Error
-                        ? err.message
-                        : "Unable to verify payment."
-                );
+                toast.error("Payment Verification Failed", {
+                    description:
+                        err instanceof Error
+                            ? err.message
+                            : "Unable to verify payment. Please try again.",
+                });
             } finally {
                 setVerifyingPayment(false);
             }
@@ -284,8 +289,6 @@ export default function MyAppointmentsPage() {
     const handlePayment = async (appointmentId: string) => {
         try {
             setPayingId(appointmentId);
-            setActionError("");
-            setActionSuccess("");
 
             const { data: tokenData, error: tokenError } =
                 await authClient.token();
@@ -321,27 +324,20 @@ export default function MyAppointmentsPage() {
         } catch (err) {
             console.error("Create checkout session error:", err);
 
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "Unable to proceed with payment."
-            );
+            toast.error("Unable to Start Payment", {
+                description:
+                    err instanceof Error
+                        ? err.message
+                        : "Unable to proceed with payment. Please try again.",
+            });
 
             setPayingId("");
         }
     };
 
     const handleCancel = async (appointmentId: string) => {
-        const confirmed = window.confirm(
-            "Are you sure you want to cancel this appointment?"
-        );
-
-        if (!confirmed) return;
-
         try {
             setCancellingId(appointmentId);
-            setActionError("");
-            setActionSuccess("");
 
             const { data: tokenData, error: tokenError } =
                 await authClient.token();
@@ -384,17 +380,21 @@ export default function MyAppointmentsPage() {
                 )
             );
 
-            setActionSuccess("Appointment cancelled successfully.");
+            toast.success("Appointment Cancelled", {
+                description: "Your appointment has been cancelled successfully.",
+            });
         } catch (err) {
             console.error("Cancel appointment error:", err);
 
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "Unable to cancel appointment."
-            );
+            toast.error("Cancellation Failed", {
+                description:
+                    err instanceof Error
+                        ? err.message
+                        : "Unable to cancel appointment. Please try again.",
+            });
         } finally {
             setCancellingId("");
+            setAppointmentToCancel(null);
         }
     };
 
@@ -434,20 +434,6 @@ export default function MyAppointmentsPage() {
                     Refresh
                 </button>
             </div>
-
-            {actionSuccess && (
-                <div className="mt-6 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-300">
-                    <CheckCircle2 className="h-5 w-5 shrink-0" />
-                    {actionSuccess}
-                </div>
-            )}
-
-            {actionError && (
-                <div className="mt-6 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-                    <AlertCircle className="h-5 w-5 shrink-0" />
-                    {actionError}
-                </div>
-            )}
 
             {verifyingPayment && (
                 <div className="mt-6 flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-sm font-medium text-foreground">
@@ -677,8 +663,8 @@ export default function MyAppointmentsPage() {
 
                                             {appointment.status.toLowerCase() === "pending" && (
                                                 <button
-                                                    onClick={() => handleCancel(appointment._id)}
-                                                    disabled={cancellingId === appointment._id}
+                                                    onClick={() => setAppointmentToCancel(appointment._id)}
+                                                    disabled={Boolean(cancellingId)}
                                                     className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
                                                 >
                                                     {cancellingId === appointment._id ? (
@@ -714,6 +700,70 @@ export default function MyAppointmentsPage() {
                             </div>
                         </article>
                     ))}
+                </div>
+            )}
+
+            {appointmentToCancel && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-6">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="cancel-appointment-title"
+                        aria-describedby="cancel-appointment-description"
+                        className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl sm:p-7"
+                    >
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100 dark:bg-red-950">
+                            <AlertCircle className="h-7 w-7 text-red-600 dark:text-red-400" />
+                        </div>
+
+                        <h2
+                            id="cancel-appointment-title"
+                            className="mt-5 text-xl font-bold text-foreground"
+                        >
+                            Cancel Appointment?
+                        </h2>
+
+                        <p
+                            id="cancel-appointment-description"
+                            className="mt-2 text-sm leading-6 text-muted-foreground"
+                        >
+                            Are you sure you want to cancel this appointment? This action cannot be undone.
+                        </p>
+
+                        <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setAppointmentToCancel(null)}
+                                disabled={Boolean(cancellingId)}
+                                className="inline-flex items-center justify-center rounded-xl border border-border px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Keep Appointment
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (appointmentToCancel) {
+                                        void handleCancel(appointmentToCancel);
+                                    }
+                                }}
+                                disabled={Boolean(cancellingId)}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {cancellingId === appointmentToCancel ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Cancelling...
+                                    </>
+                                ) : (
+                                    <>
+                                        <XCircle className="h-4 w-4" />
+                                        Yes, Cancel Appointment
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

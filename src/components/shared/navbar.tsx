@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import ProfileDropdown from "@/components/shared/profile-dropdown";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 import {
   Sheet,
   SheetClose,
@@ -51,13 +52,26 @@ export function Navbar() {
       const { error } = await authClient.signOut();
 
       if (error) {
+        toast.error("Logout Failed", {
+          description:
+            error.message || "Unable to log out. Please try again.",
+        });
         return;
       }
 
+      toast.success("Logged Out Successfully", {
+        description: "You have been signed out of SalonBook.",
+      });
+
       router.replace("/");
       router.refresh();
-    } catch {
-      setIsLoggingOut(false);
+    } catch (error) {
+      toast.error("Logout Failed", {
+        description:
+          error instanceof Error
+            ? error.message
+            : "Something went wrong. Please try again.",
+      });
     } finally {
       setIsLoggingOut(false);
     }

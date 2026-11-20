@@ -13,6 +13,8 @@ import {
   X,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
+import { uploadImage } from "@/lib/upload-image";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -44,19 +46,28 @@ export default function SignUpPage() {
     passwordRules.lowercase;
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setMessage("Please select a valid image file.");
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      setMessage("Only JPG, PNG and WEBP images are allowed.");
       setMessageType("error");
+      input.value = "";
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage("Image size must be less than 5MB.");
+    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+      setMessage("Image size must be greater than 0 and less than 5MB.");
       setMessageType("error");
+      input.value = "";
       return;
     }
 
@@ -67,7 +78,9 @@ export default function SignUpPage() {
     const reader = new FileReader();
 
     reader.onloadend = () => {
-      setProfileImage(reader.result as string);
+      if (typeof reader.result === "string") {
+        setProfileImage(reader.result);
+      }
     };
 
     reader.readAsDataURL(file);
@@ -84,27 +97,6 @@ export default function SignUpPage() {
     }
   };
 
-  const uploadImage = async () => {
-    if (!profileFile) {
-      return "";
-    }
-
-    const formData = new FormData();
-    formData.append("image", profileFile);
-
-    const response = await fetch("/api/upload-image", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok || !data.url) {
-      throw new Error(data.message || "Image upload failed.");
-    }
-
-    return data.url;
-  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -135,8 +127,9 @@ export default function SignUpPage() {
       let imageUrl = "";
 
       if (profileFile) {
-        imageUrl = await uploadImage();
+        imageUrl = await uploadImage(profileFile, "signup");
       }
+
 
       const { error } = await authClient.signUp.email({
         name,
@@ -151,13 +144,16 @@ export default function SignUpPage() {
         return;
       }
 
-      setMessage("Account created successfully. Redirecting to sign in...");
-      setMessageType("success");
+      toast.success("Account Created Successfully!", {
+        description: "Welcome to SalonBook! Redirecting you to sign in...",
+        duration: 4000,
+      });
 
       setTimeout(() => {
         router.push("/sign-in");
-        router.refresh()
+        router.refresh();
       }, 1200);
+
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -357,7 +353,7 @@ export default function SignUpPage() {
                     id="profileImage"
                     name="profileImage"
                     type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={handleImageUpload}
                     disabled={loading || googleLoading}
                     className="hidden"
@@ -386,11 +382,10 @@ export default function SignUpPage() {
 
             {message && (
               <div
-                className={`rounded-lg px-3.5 py-2.5 text-xs font-medium ${
-                  messageType === "error"
-                    ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                    : "bg-[#E8FFF2] text-[#075E46] dark:bg-[#203B2E] dark:text-[#A7E8C5]"
-                }`}
+                className={`rounded-lg px-3.5 py-2.5 text-xs font-medium ${messageType === "error"
+                  ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                  : "bg-[#E8FFF2] text-[#075E46] dark:bg-[#203B2E] dark:text-[#A7E8C5]"
+                  }`}
               >
                 {message}
               </div>

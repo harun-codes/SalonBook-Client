@@ -4,7 +4,6 @@
 import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
-import { Toaster } from "sonner";
 
 export function AppShell({
   children,
@@ -24,13 +23,6 @@ export function AppShell({
       {children}
 
       {!isDashboard && <Footer />}
-
-      <Toaster
-        position="top-right"
-        richColors
-        closeButton
-        duration={4000}
-      />
     </div>
   );
 }

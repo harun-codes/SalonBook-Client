@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export interface Service {
     _id: string;
@@ -72,7 +73,6 @@ export default function ServiceDetails({
     const [showBookingForm, setShowBookingForm] = useState(false);
 
     const [loading, setLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState("");
 
     const isActive = service.status?.toLowerCase() === "active";
 
@@ -87,54 +87,59 @@ export default function ServiceDetails({
     ) => {
         e.preventDefault();
 
-        setErrorMessage("");
-
         if (!session?.user || userRole !== "customer") {
-            setErrorMessage(
-                "Only customer accounts can submit appointment requests."
-            );
+            toast.error("Booking Not Allowed", {
+                description:
+                    "Only customer accounts can submit appointment requests.",
+            });
             return;
         }
 
         if (!isActive) {
-            setErrorMessage(
-                "This service is currently unavailable for booking."
-            );
+            toast.error("Service Unavailable", {
+                description:
+                    "This service is currently unavailable for booking.",
+            });
             return;
         }
 
         if (!appointmentDate || !timeSlot) {
-            setErrorMessage(
-                "Please select an appointment date and time."
-            );
+            toast.error("Missing Information", {
+                description:
+                    "Please select an appointment date and time.",
+            });
             return;
         }
 
         if (!/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)) {
-            setErrorMessage(
-                "Please select a valid appointment date."
-            );
+            toast.error("Invalid Date", {
+                description:
+                    "Please select a valid appointment date.",
+            });
             return;
         }
 
         if (appointmentDate < getDhakaToday()) {
-            setErrorMessage(
-                "Appointment date cannot be in the past."
-            );
+            toast.error("Invalid Appointment Date", {
+                description:
+                    "Appointment date cannot be in the past.",
+            });
             return;
         }
 
         if (!TIME_SLOTS.includes(timeSlot)) {
-            setErrorMessage(
-                "Please select a valid time slot."
-            );
+            toast.error("Invalid Time Slot", {
+                description:
+                    "Please select a valid time slot.",
+            });
             return;
         }
 
         if (message.trim().length > 500) {
-            setErrorMessage(
-                "Message must not exceed 500 characters."
-            );
+            toast.error("Message Too Long", {
+                description:
+                    "Message must not exceed 500 characters.",
+            });
             return;
         }
 
@@ -191,25 +196,51 @@ export default function ServiceDetails({
                                 ? "Only customer accounts can submit appointments."
                                 : "Failed to create appointment. Please try again.";
 
-                throw new Error(
-                    result?.message || fallbackMessage
-                );
+                const errorDescription =
+                    result?.message || fallbackMessage;
+
+                if (response.status === 409) {
+                    toast.error("Time Slot Unavailable", {
+                        description: errorDescription,
+                    });
+                } else if (response.status === 401) {
+                    toast.error("Session Expired", {
+                        description: errorDescription,
+                    });
+                } else if (response.status === 403) {
+                    toast.error("Booking Not Allowed", {
+                        description: errorDescription,
+                    });
+                } else {
+                    toast.error("Appointment Booking Failed", {
+                        description: errorDescription,
+                    });
+                }
+
+                return;
             }
 
             setAppointmentDate("");
             setTimeSlot("");
             setMessage("");
 
+            toast.success("Appointment Requested Successfully!", {
+                description:
+                    "Your appointment request has been submitted and is waiting for admin confirmation.",
+                duration: 5000,
+            });
+
             router.push("/dashboard/customer/appointments");
 
         } catch (error) {
             console.error("Appointment booking error:", error);
 
-            setErrorMessage(
-                error instanceof Error
-                    ? error.message
-                    : "Something went wrong. Please try again."
-            );
+            toast.error("Appointment Booking Failed", {
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : "Something went wrong. Please try again.",
+            });
         } finally {
             setLoading(false);
         }
@@ -373,10 +404,7 @@ export default function ServiceDetails({
 
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setErrorMessage("");
-                                            setShowBookingForm(true);
-                                        }}
+                                        onClick={() => setShowBookingForm(true)}
                                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 font-bold text-primary-foreground transition-colors hover:opacity-90"
                                     >
                                         Book Appointment
@@ -399,10 +427,7 @@ export default function ServiceDetails({
 
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setShowBookingForm(false);
-                                                setErrorMessage("");
-                                            }}
+                                            onClick={() => setShowBookingForm(false)}
                                             disabled={loading}
                                             className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-primary disabled:opacity-50"
                                         >
@@ -410,15 +435,6 @@ export default function ServiceDetails({
                                             Back
                                         </button>
                                     </div>
-
-                                    {errorMessage && (
-                                        <div
-                                            role="alert"
-                                            className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
-                                        >
-                                            {errorMessage}
-                                        </div>
-                                    )}
 
                                     <div>
                                         <label
@@ -433,10 +449,9 @@ export default function ServiceDetails({
                                             type="date"
                                             min={getDhakaToday()}
                                             value={appointmentDate}
-                                            onChange={(e) => {
-                                                setAppointmentDate(e.target.value);
-                                                setErrorMessage("");
-                                            }}
+                                            onChange={(e) =>
+                                                setAppointmentDate(e.target.value)
+                                            }
                                             required
                                             disabled={loading}
                                             className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
@@ -454,10 +469,9 @@ export default function ServiceDetails({
                                         <select
                                             id="timeSlot"
                                             value={timeSlot}
-                                            onChange={(e) => {
-                                                setTimeSlot(e.target.value);
-                                                setErrorMessage("");
-                                            }}
+                                            onChange={(e) =>
+                                                setTimeSlot(e.target.value)
+                                            }
                                             required
                                             disabled={loading}
                                             className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
@@ -491,10 +505,9 @@ export default function ServiceDetails({
                                         <textarea
                                             id="message"
                                             value={message}
-                                            onChange={(e) => {
-                                                setMessage(e.target.value);
-                                                setErrorMessage("");
-                                            }}
+                                            onChange={(e) =>
+                                                setMessage(e.target.value)
+                                            }
                                             maxLength={500}
                                             rows={3}
                                             disabled={loading}

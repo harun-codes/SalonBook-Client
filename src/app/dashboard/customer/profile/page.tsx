@@ -10,6 +10,7 @@ import {
 
 import type { ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import {
   User,
@@ -21,11 +22,11 @@ import {
   Save,
   Loader2,
   AlertCircle,
-  CheckCircle2,
   RefreshCw,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
+import { uploadImage } from "@/lib/upload-image";
 
 interface Profile {
   name: string;
@@ -37,11 +38,6 @@ interface Profile {
 interface ProfileResponse {
   success: boolean;
   user?: Partial<Profile>;
-  message?: string;
-}
-
-interface UploadResponse {
-  url?: string;
   message?: string;
 }
 
@@ -77,14 +73,9 @@ export default function CustomerProfilePage() {
 
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const fetchProfile = useCallback(async () => {
+  const fetchProfile = useCallback(async (showSuccessToast = false) => {
     try {
       setLoading(true);
-      setError("");
-      setSuccess("");
       setProfileLoaded(false);
 
       const token = await getAuthToken();
@@ -113,12 +104,21 @@ export default function CustomerProfilePage() {
       });
 
       setProfileLoaded(true);
+
+      if (showSuccessToast) {
+        toast.success("Profile Refreshed", {
+          description: "Your profile information has been loaded successfully.",
+        });
+      }
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Something went wrong."
-      );
+          : "Something went wrong.";
+
+      toast.error("Unable to Load Profile", {
+        description: message,
+      });
     } finally {
       setLoading(false);
     }
@@ -132,61 +132,68 @@ export default function CustomerProfilePage() {
   const handleImageUpload = async (
     event: ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
 
     if (!file) return;
 
-    setError("");
-    setSuccess("");
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
 
-    if (!file.type.startsWith("image/")) {
-      setError("Please select a valid image.");
-      event.target.value = "";
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Invalid Image Format", {
+        description: "Please select a JPG, PNG or WEBP image.",
+      });
+
+      input.value = "";
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image size must be less than 5MB.");
-      event.target.value = "";
+    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+      toast.error("Invalid Image Size", {
+        description: "Image size must be greater than 0 and less than 5MB.",
+      });
+
+      input.value = "";
       return;
     }
 
     try {
       setUploading(true);
 
-      const formData = new FormData();
-      formData.append("image", file);
+      const uploadedUrl = await uploadImage(file, "profile");
 
-      const response = await fetch("/api/upload-image", {
-        method: "POST",
-        body: formData,
-      });
+      const imageUrl = new URL(uploadedUrl);
 
-      const result: UploadResponse = await response.json();
-
-      if (!response.ok || !result.url) {
-        throw new Error(
-          result.message || "Image upload failed."
-        );
+      if (
+        imageUrl.protocol !== "https:" ||
+        imageUrl.username ||
+        imageUrl.password
+      ) {
+        throw new Error("Invalid uploaded image URL.");
       }
 
       setProfile((prev) => ({
         ...prev,
-        image: result.url!,
+        image: uploadedUrl,
       }));
 
-      setSuccess(
-        "Image uploaded. Save changes to update your profile."
-      );
+      toast.success("Image Uploaded Successfully", {
+        description: "Save changes to update your profile photo.",
+      });
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to upload image."
-      );
+      toast.error("Image Upload Failed", {
+        description:
+          err instanceof Error
+            ? err.message
+            : "Failed to upload image.",
+      });
     } finally {
       setUploading(false);
-      event.target.value = "";
+      input.value = "";
     }
   };
 
@@ -196,11 +203,9 @@ export default function CustomerProfilePage() {
       image: "",
     }));
 
-    setSuccess(
-      "Image removed. Save changes to confirm."
-    );
-
-    setError("");
+    toast.info("Profile Image Removed", {
+      description: "Save changes to confirm this update.",
+    });
   };
 
   const handleSave = async (
@@ -208,14 +213,13 @@ export default function CustomerProfilePage() {
   ) => {
     event.preventDefault();
 
-    setError("");
-    setSuccess("");
-
     const trimmedName = profile.name.trim();
     const trimmedPhone = profile.phone.trim();
 
     if (trimmedName.length < 2 || trimmedName.length > 60) {
-      setError("Name must contain 2-60 characters.");
+      toast.error("Invalid Name", {
+        description: "Name must contain 2-60 characters.",
+      });
       return;
     }
 
@@ -223,7 +227,9 @@ export default function CustomerProfilePage() {
       trimmedPhone &&
       !/^[+()\d\s-]{7,20}$/.test(trimmedPhone)
     ) {
-      setError("Please enter a valid phone number.");
+      toast.error("Invalid Phone Number", {
+        description: "Please enter a valid phone number.",
+      });
       return;
     }
 
@@ -292,15 +298,16 @@ export default function CustomerProfilePage() {
 
       router.refresh();
 
-      setSuccess(
-        "Your profile has been updated successfully."
-      );
+      toast.success("Profile Updated Successfully", {
+        description: "Your personal information has been updated successfully.",
+      });
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong."
-      );
+      toast.error("Profile Update Failed", {
+        description:
+          err instanceof Error
+            ? err.message
+            : "Something went wrong.",
+      });
     } finally {
       setSaving(false);
     }
@@ -311,7 +318,7 @@ export default function CustomerProfilePage() {
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-        
+
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
             My Profile
           </h1>
@@ -323,7 +330,7 @@ export default function CustomerProfilePage() {
 
         <button
           type="button"
-          onClick={fetchProfile}
+          onClick={() => fetchProfile(true)}
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
         >
@@ -335,26 +342,6 @@ export default function CustomerProfilePage() {
           Refresh
         </button>
       </div>
-
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400"
-        >
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div
-          role="status"
-          className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/30 dark:text-green-400"
-        >
-          <CheckCircle2 className="h-5 w-5 shrink-0" />
-          {success}
-        </div>
-      )}
 
       {loading ? (
         <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-border bg-card">
@@ -379,7 +366,7 @@ export default function CustomerProfilePage() {
 
           <button
             type="button"
-            onClick={fetchProfile}
+            onClick={() => fetchProfile(true)}
             className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
             Try Again
@@ -577,7 +564,7 @@ export default function CustomerProfilePage() {
 
             <button
               type="button"
-              onClick={fetchProfile}
+              onClick={() => fetchProfile(true)}
               disabled={saving || uploading}
               className="rounded-xl border border-border px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
             >

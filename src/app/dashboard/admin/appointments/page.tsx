@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -20,6 +19,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 interface Appointment {
   _id: string;
@@ -235,11 +235,13 @@ export default function AdminAppointmentsPage() {
       setTotalCount(result.count || 0);
       setTotalPages(result.totalPages || 1);
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Something went wrong."
-      );
+          : "Something went wrong.";
+
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -291,11 +293,13 @@ export default function AdminAppointmentsPage() {
 
       setSelectedAppointment(result.appointment);
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Failed to load appointment details."
-      );
+          : "Failed to load appointment details.";
+
+      setError(message);
+      toast.error(message);
     } finally {
       setDetailsLoading(false);
     }
@@ -330,21 +334,25 @@ export default function AdminAppointmentsPage() {
         );
       }
 
-      setNotice(
+      const successMessage =
         action === "confirm"
           ? "Appointment confirmed successfully."
-          : "Appointment cancelled successfully."
-      );
+          : "Appointment cancelled successfully.";
+
+      setNotice(successMessage);
+      toast.success(successMessage);
 
       setActionTarget(null);
 
       await fetchAppointments();
     } catch (err) {
-      setActionError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Something went wrong."
-      );
+          : "Something went wrong.";
+
+      setActionError(message);
+      toast.error(message);
     } finally {
       setActionLoading(false);
     }
@@ -360,7 +368,6 @@ export default function AdminAppointmentsPage() {
     <div className="space-y-7">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
             Manage Appointments
           </h1>

@@ -18,10 +18,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  AlertCircle,
-  CheckCircle2,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 interface Customer {
   id: string;
@@ -136,8 +135,6 @@ function CustomerAvatar({
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -152,7 +149,6 @@ export default function AdminUsersPage() {
 
   const [actionTarget, setActionTarget] = useState<Customer | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -163,10 +159,9 @@ export default function AdminUsersPage() {
     return () => clearTimeout(timeout);
   }, [searchInput]);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (showSuccessToast = false) => {
     try {
       setLoading(true);
-      setError("");
 
       const token = await getToken();
 
@@ -197,12 +192,24 @@ export default function AdminUsersPage() {
       setUsers(result.users || []);
       setTotalCount(result.count || 0);
       setTotalPages(result.totalPages || 1);
+
+      if (showSuccessToast) {
+        toast.success("Customer list refreshed successfully.");
+      }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong."
-      );
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+
+      toast.error(message, {
+        description: "Unable to load customers.",
+        action: {
+          label: "Try Again",
+          onClick: () => {
+            // eslint-disable-next-line react-hooks/immutability
+            void fetchUsers(true);
+          },
+        },
+      });
     } finally {
       setLoading(false);
     }
@@ -216,7 +223,6 @@ export default function AdminUsersPage() {
   const handleViewDetails = async (id: string) => {
     try {
       setDetailsLoading(true);
-      setError("");
 
       const token = await getToken();
 
@@ -239,7 +245,7 @@ export default function AdminUsersPage() {
 
       setSelectedUser(result.user);
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? err.message
           : "Failed to load customer details."
@@ -256,7 +262,6 @@ export default function AdminUsersPage() {
 
     try {
       setActionLoading(true);
-      setActionError("");
 
       const token = await getToken();
 
@@ -276,7 +281,7 @@ export default function AdminUsersPage() {
         throw new Error(result.message || "Failed to update customer account.");
       }
 
-      setNotice(
+      toast.success(
         action === "block"
           ? "Customer blocked successfully."
           : "Customer unblocked successfully."
@@ -290,7 +295,7 @@ export default function AdminUsersPage() {
 
       await fetchUsers();
     } catch (err) {
-      setActionError(
+      toast.error(
         err instanceof Error
           ? err.message
           : "Something went wrong."
@@ -321,7 +326,7 @@ export default function AdminUsersPage() {
 
         <button
           type="button"
-          onClick={fetchUsers}
+          onClick={() => fetchUsers(true)}
           disabled={loading}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
         >
@@ -331,23 +336,6 @@ export default function AdminUsersPage() {
           Refresh
         </button>
       </div>
-
-      {notice && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-400">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 shrink-0" />
-            {notice}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setNotice("")}
-            aria-label="Dismiss notification"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -408,26 +396,6 @@ export default function AdminUsersPage() {
           </select>
         </div>
       </div>
-
-      {error && (
-        <div
-          role="alert"
-          className="flex flex-col justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400 sm:flex-row sm:items-center"
-        >
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 shrink-0" />
-            {error}
-          </div>
-
-          <button
-            type="button"
-            onClick={fetchUsers}
-            className="font-semibold underline"
-          >
-            Try Again
-          </button>
-        </div>
-      )}
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="border-b border-border px-5 py-4">
@@ -550,7 +518,6 @@ export default function AdminUsersPage() {
                           type="button"
                           onClick={() => {
                             setActionTarget(customer);
-                            setActionError("");
                           }}
                           title={
                             customer.isBlocked
@@ -756,7 +723,6 @@ export default function AdminUsersPage() {
                   type="button"
                   onClick={() => {
                     setActionTarget(selectedUser);
-                    setActionError("");
                   }}
                   className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold text-white ${
                     selectedUser.isBlocked
@@ -807,20 +773,12 @@ export default function AdminUsersPage() {
                 : `Are you sure you want to block ${actionTarget.name}? This customer will lose access to protected platform features.`}
             </p>
 
-            {actionError && (
-              <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                {actionError}
-              </div>
-            )}
-
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => {
                   if (!actionLoading) {
                     setActionTarget(null);
-                    setActionError("");
                   }
                 }}
                 disabled={actionLoading}
