@@ -35,7 +35,16 @@ export default function RootLayout({
         <ThemeProvider>
           <Suspense
             fallback={
-              <div className="min-h-screen bg-background" />
+              <div
+                className="flex min-h-screen items-center justify-center bg-background"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <span>Loading SalonBook...</span>
+                </div>
+              </div>
             }
           >
             <AppShell>{children}</AppShell>
