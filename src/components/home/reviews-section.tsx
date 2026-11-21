@@ -1,6 +1,7 @@
 
 "use client";
 
+import Image from "next/image";
 import { useRef } from "react";
 import { ArrowLeft, ArrowRight, Star } from "lucide-react";
 
@@ -146,14 +147,18 @@ export function ReviewsSection() {
               </div>
 
               <div className="mt-10 flex items-center gap-4">
-                <div
-                  role="img"
-                  aria-label={`${review.name} profile photo`}
-                  className="h-14 w-14 shrink-0 rounded-full border border-border bg-cover bg-center shadow-sm sm:h-16 sm:w-16"
-                  style={{
-                    backgroundImage: `url("${review.avatar}")`,
-                  }}
-                />
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-border shadow-sm sm:h-16 sm:w-16">
+                  <Image
+                    src={review.avatar}
+                    alt={`${review.name} profile photo`}
+                    width={64}
+                    height={64}
+                    sizes="(min-width: 640px) 64px, 56px"
+                    quality={75}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
 
                 <div className="min-w-0">
                   <h4 className="truncate text-base font-semibold text-foreground sm:text-lg">
