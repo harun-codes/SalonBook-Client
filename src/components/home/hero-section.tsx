@@ -1,4 +1,5 @@
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -6,17 +7,21 @@ import {
   Sparkles,
 } from "lucide-react";
 
-
 export function HeroSection() {
   return (
     <section className="relative isolate flex min-h-[400px] items-center overflow-hidden bg-[#075E46] sm:min-h-[440px] lg:min-h-[500px]">
-      <div
-        className="absolute inset-0 -z-20 bg-cover bg-center"
-        style={{
-          backgroundImage:
-            "url('https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=2000&q=90')",
-        }}
-      />
+      <div className="absolute inset-0 -z-20">
+        <Image
+          src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=2000&q=90"
+          alt=""
+          fill
+          preload
+          fetchPriority="high"
+          sizes="100vw"
+          quality={75}
+          className="object-cover object-center"
+        />
+      </div>
 
       <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#052F24]/90 via-[#075E46]/75 to-[#075E46]/25 dark:from-[#041B14]/95 dark:via-[#052F24]/90 dark:to-[#041B14]/65" />
 
@@ -57,7 +62,6 @@ export function HeroSection() {
               Discover More
             </Link>
           </div>
-
 
           <div className="flex flex-wrap gap-x-5 gap-y-3 pt-3">
             {[
