@@ -14,8 +14,7 @@ const reviews = [
     review:
       "Amazing experience! The booking process was simple and convenient. I found exactly the salon service I was looking for. Highly recommended!",
     rating: 5,
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=85",
+    avatar: "/images/reviews/sarah-ahmed.webp",
   },
   {
     id: 2,
@@ -25,8 +24,7 @@ const reviews = [
     review:
       "SalonBook makes finding beauty services so easy. The interface is clean, the booking process is smooth, and everything is easy to understand.",
     rating: 5,
-    avatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=85",
+    avatar: "/images/reviews/daniel-rahman.webp",
   },
   {
     id: 3,
@@ -36,8 +34,7 @@ const reviews = [
     review:
       "I love how easy it is to explore different salon services. Finding the right treatment and booking an appointment has never been this convenient.",
     rating: 5,
-    avatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=85",
+    avatar: "/images/reviews/emily-wilson.webp",
   },
   {
     id: 4,
@@ -47,8 +44,7 @@ const reviews = [
     review:
       "SalonBook has made my self-care routine much easier. I can explore services, check prices, and manage my appointments in one place.",
     rating: 5,
-    avatar:
-      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&q=85",
+    avatar: "/images/reviews/alex-morgan.webp",
   },
   {
     id: 5,
@@ -58,8 +54,7 @@ const reviews = [
     review:
       "A beautiful and easy-to-use platform. I really appreciate how simple it is to discover salon services and find the right treatment.",
     rating: 5,
-    avatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=85",
+    avatar: "/images/reviews/olivia-martin.webp",
   },
 ];
 
@@ -79,7 +74,7 @@ export function ReviewsSection() {
   };
 
   const navigationButton =
-    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground transition-all duration-300 hover:border-primary hover:bg-secondary hover:text-primary sm:h-12 sm:w-12";
+    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors duration-300 hover:border-primary hover:bg-secondary hover:text-primary sm:h-12 sm:w-12";
 
   return (
     <section className="overflow-hidden bg-background py-16 sm:py-20 lg:py-24">
@@ -123,7 +118,7 @@ export function ReviewsSection() {
           {reviews.map((review) => (
             <article
               key={review.id}
-              className="flex min-h-[400px] shrink-0 basis-[88%] snap-start flex-col justify-between rounded-3xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/40 hover:shadow-lg sm:min-h-[420px] sm:basis-[calc(50%-10px)] sm:p-8 lg:basis-[calc(33.333%-14px)]"
+              className="flex min-h-[400px] shrink-0 basis-[88%] snap-start flex-col justify-between rounded-3xl border border-border bg-card p-6 transition-[border-color,box-shadow] duration-300 hover:border-primary/40 hover:shadow-lg sm:min-h-[420px] sm:basis-[calc(50%-10px)] sm:p-8 lg:basis-[calc(33.333%-14px)]"
             >
               <div className="space-y-6">
                 <div className="flex items-center gap-1">

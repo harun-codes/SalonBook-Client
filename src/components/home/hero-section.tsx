@@ -12,11 +12,10 @@ export function HeroSection() {
     <section className="relative isolate flex min-h-[400px] items-center overflow-hidden bg-[#075E46] sm:min-h-[440px] lg:min-h-[500px]">
       <div className="absolute inset-0 -z-20">
         <Image
-          src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=2000&q=90"
+          src="/images/hero/salon-hero.webp"
           alt=""
           fill
           preload
-          fetchPriority="high"
           sizes="100vw"
           quality={75}
           className="object-cover object-center"
