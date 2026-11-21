@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   Clock3,
@@ -175,6 +176,8 @@ function PaymentBadge({ status }: { status: string }) {
 export default function AdminAppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [tableScroll, setTableScroll] = useState({ left: 0, max: 0 });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -264,6 +267,31 @@ export default function AdminAppointmentsPage() {
       appointment._id.toLowerCase().includes(searchText)
     );
   });
+
+  const syncTableScroll = useCallback(() => {
+    const element = tableScrollRef.current;
+
+    if (!element) return;
+
+    const left = element.scrollLeft;
+    const max = Math.max(element.scrollWidth - element.clientWidth, 0);
+
+    setTableScroll((current) =>
+      current.left === left && current.max === max
+        ? current
+        : { left, max }
+    );
+  }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(syncTableScroll);
+    window.addEventListener("resize", syncTableScroll);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", syncTableScroll);
+    };
+  }, [syncTableScroll, loading, filteredAppointments.length]);
 
   const handleViewDetails = async (id: string) => {
     try {
@@ -537,150 +565,174 @@ export default function AdminAppointmentsPage() {
           </div>
         ) : (
           <div className="w-full min-w-0">
-            <table className="w-full table-fixed text-left">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="w-[34%] px-2 py-4 text-[10px] font-bold uppercase text-muted-foreground sm:w-[22%] sm:px-3 sm:text-xs">
-                    Customer
-                  </th>
+            <div
+              ref={tableScrollRef}
+              onScroll={syncTableScroll}
+              className="w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x md:overflow-x-hidden"
+            >
+              <table className="w-full min-w-[640px] table-auto md:min-w-0 md:table-fixed">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="min-w-[170px] whitespace-nowrap px-3 py-4 text-[10px] font-bold uppercase text-muted-foreground sm:text-xs">
+                      Customer
+                    </th>
 
-                  <th className="w-[34%] px-2 py-4 text-[10px] font-bold uppercase text-muted-foreground sm:w-[19%] sm:text-xs">
-                    Service
-                  </th>
+                    <th className="min-w-[180px] whitespace-nowrap px-3 py-4 text-[10px] font-bold uppercase text-muted-foreground sm:text-xs">
+                      Service
+                    </th>
 
-                  <th className="hidden px-2 py-4 text-xs font-bold uppercase text-muted-foreground md:table-cell md:w-[15%]">
-                    Date & Time
-                  </th>
+                    <th className="hidden min-w-[140px] whitespace-nowrap px-3 py-4 text-xs font-bold uppercase text-muted-foreground md:table-cell">
+                      Date & Time
+                    </th>
 
-                  <th className="hidden px-2 py-4 text-xs font-bold uppercase text-muted-foreground lg:table-cell lg:w-[11%]">
-                    Amount
-                  </th>
+                    <th className="hidden min-w-[100px] whitespace-nowrap px-3 py-4 text-xs font-bold uppercase text-muted-foreground lg:table-cell">
+                      Amount
+                    </th>
 
-                  <th className="hidden px-2 py-4 text-xs font-bold uppercase text-muted-foreground lg:table-cell lg:w-[12%]">
-                    Payment
-                  </th>
+                    <th className="hidden min-w-[120px] whitespace-nowrap px-3 py-4 text-xs font-bold uppercase text-muted-foreground lg:table-cell">
+                      Payment
+                    </th>
 
-                  <th className="w-[17%] px-1 py-4 text-[10px] font-bold uppercase text-muted-foreground sm:w-[14%] sm:text-xs">
-                    Status
-                  </th>
+                    <th className="min-w-[130px] whitespace-nowrap px-3 py-4 text-[10px] font-bold uppercase text-muted-foreground sm:text-xs">
+                      Status
+                    </th>
 
-                  <th className="w-[15%] px-1 py-4 text-center text-[10px] font-bold uppercase text-muted-foreground sm:w-[12%] sm:text-xs">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
+                    <th className="min-w-[110px] whitespace-nowrap px-3 py-4 text-center text-[10px] font-bold uppercase text-muted-foreground sm:text-xs">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
 
-              <tbody className="divide-y divide-border">
-                {filteredAppointments.map((appointment) => (
-                  <tr
-                    key={appointment._id}
-                    className="transition-colors hover:bg-muted/30"
-                  >
-                    <td className="min-w-0 px-2 py-4 sm:px-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 sm:flex">
-                          <UserRound className="h-5 w-5" />
+                <tbody className="divide-y divide-border">
+                  {filteredAppointments.map((appointment) => (
+                    <tr
+                      key={appointment._id}
+                      className="transition-colors hover:bg-muted/30"
+                    >
+                      <td className="min-w-0 px-2 py-4 sm:px-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 sm:flex">
+                            <UserRound className="h-5 w-5" />
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-bold text-foreground sm:text-sm">
+                              {getCustomerName(appointment)}
+                            </p>
+
+                            <p className="mt-1 hidden truncate text-xs text-muted-foreground sm:block">
+                              {appointment.customer?.email || "No email"}
+                            </p>
+
+                            <p className="mt-1 text-[9px] text-muted-foreground md:hidden">
+                              {formatDate(appointment.appointmentDate)}
+                              {" · "}
+                              {appointment.timeSlot}
+                            </p>
+                          </div>
                         </div>
+                      </td>
 
-                        <div className="min-w-0">
-                          <p className="truncate text-[11px] font-bold text-foreground sm:text-sm">
-                            {getCustomerName(appointment)}
-                          </p>
+                      <td className="min-w-0 px-2 py-4">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted sm:flex">
+                            {appointment.service?.image ? (
+                              <img
+                                src={appointment.service.image}
+                                alt={getServiceName(appointment)}
+                                className="h-full w-full rounded-lg object-cover"
+                              />
+                            ) : (
+                              <Scissors className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
 
-                          <p className="mt-1 hidden truncate text-xs text-muted-foreground sm:block">
-                            {appointment.customer?.email || "No email"}
-                          </p>
+                          <div className="min-w-0">
+                            <p className="truncate text-[10px] font-semibold text-foreground sm:text-sm">
+                              {getServiceName(appointment)}
+                            </p>
 
-                          <p className="mt-1 text-[9px] text-muted-foreground md:hidden">
-                            {formatDate(appointment.appointmentDate)}
-                            {" · "}
-                            {appointment.timeSlot}
-                          </p>
+                            <p className="mt-1 truncate text-[9px] text-muted-foreground lg:hidden">
+                              {formatPrice(appointment.servicePrice)}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="min-w-0 px-2 py-4">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted sm:flex">
-                          {appointment.service?.image ? (
-                            <img
-                              src={appointment.service.image}
-                              alt={getServiceName(appointment)}
-                              className="h-full w-full rounded-lg object-cover"
-                            />
-                          ) : (
-                            <Scissors className="h-4 w-4 text-muted-foreground" />
+                      <td className="hidden px-2 py-4 md:table-cell">
+                        <p className="whitespace-nowrap text-xs font-semibold text-foreground">
+                          {formatDate(appointment.appointmentDate)}
+                        </p>
+
+                        <p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">
+                          {appointment.timeSlot}
+                        </p>
+                      </td>
+
+                      <td className="hidden whitespace-nowrap px-2 py-4 text-sm font-bold text-foreground lg:table-cell">
+                        {formatPrice(appointment.servicePrice)}
+                      </td>
+
+                      <td className="hidden px-2 py-4 lg:table-cell">
+                        <PaymentBadge status={appointment.paymentStatus} />
+                      </td>
+
+                      <td className="px-1 py-4 sm:px-2">
+                        <StatusBadge status={appointment.status} />
+                      </td>
+
+                      <td className="px-1 py-4">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleViewDetails(appointment._id)
+                            }
+                            disabled={detailsLoading}
+                            title="View details"
+                            aria-label="View appointment details"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-primary hover:bg-muted hover:text-primary disabled:opacity-50 sm:h-9 sm:w-9"
+                          >
+                            <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          </button>
+
+                          {appointment.status === "pending" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActionTarget({
+                                    appointment,
+                                    action: "confirm",
+                                  });
+                                  setActionError("");
+                                }}
+                                title="Confirm appointment"
+                                aria-label="Confirm appointment"
+                                className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 text-emerald-600 transition-colors hover:bg-emerald-50 dark:border-emerald-900 dark:hover:bg-emerald-950/40 sm:flex"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActionTarget({
+                                    appointment,
+                                    action: "cancel",
+                                  });
+                                  setActionError("");
+                                }}
+                                title="Cancel appointment"
+                                aria-label="Cancel appointment"
+                                className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-600 transition-colors hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40 sm:flex"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            </>
                           )}
-                        </div>
 
-                        <div className="min-w-0">
-                          <p className="truncate text-[10px] font-semibold text-foreground sm:text-sm">
-                            {getServiceName(appointment)}
-                          </p>
-
-                          <p className="mt-1 truncate text-[9px] text-muted-foreground lg:hidden">
-                            {formatPrice(appointment.servicePrice)}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="hidden px-2 py-4 md:table-cell">
-                      <p className="whitespace-nowrap text-xs font-semibold text-foreground">
-                        {formatDate(appointment.appointmentDate)}
-                      </p>
-
-                      <p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">
-                        {appointment.timeSlot}
-                      </p>
-                    </td>
-
-                    <td className="hidden whitespace-nowrap px-2 py-4 text-sm font-bold text-foreground lg:table-cell">
-                      {formatPrice(appointment.servicePrice)}
-                    </td>
-
-                    <td className="hidden px-2 py-4 lg:table-cell">
-                      <PaymentBadge status={appointment.paymentStatus} />
-                    </td>
-
-                    <td className="px-1 py-4 sm:px-2">
-                      <StatusBadge status={appointment.status} />
-                    </td>
-
-                    <td className="px-1 py-4">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleViewDetails(appointment._id)
-                          }
-                          disabled={detailsLoading}
-                          title="View details"
-                          aria-label="View appointment details"
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-primary hover:bg-muted hover:text-primary disabled:opacity-50 sm:h-9 sm:w-9"
-                        >
-                          <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </button>
-
-                        {appointment.status === "pending" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActionTarget({
-                                  appointment,
-                                  action: "confirm",
-                                });
-                                setActionError("");
-                              }}
-                              title="Confirm appointment"
-                              aria-label="Confirm appointment"
-                              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 text-emerald-600 transition-colors hover:bg-emerald-50 dark:border-emerald-900 dark:hover:bg-emerald-950/40 sm:flex"
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                            </button>
-
+                          {appointment.status === "confirmed" && (
                             <button
                               type="button"
                               onClick={() => {
@@ -696,32 +748,46 @@ export default function AdminAppointmentsPage() {
                             >
                               <XCircle className="h-4 w-4" />
                             </button>
-                          </>
-                        )}
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                        {appointment.status === "confirmed" && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActionTarget({
-                                appointment,
-                                action: "cancel",
-                              });
-                              setActionError("");
-                            }}
-                            title="Cancel appointment"
-                            aria-label="Cancel appointment"
-                            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-600 transition-colors hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40 sm:flex"
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {tableScroll.max > 0 && (
+              <div className="flex items-center gap-3 border-t border-border px-4 py-3 sm:hidden">
+                <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
+                  Scroll
+                </span>
+
+                <input
+                  type="range"
+                  min={0}
+                  max={tableScroll.max}
+                  value={Math.min(tableScroll.left, tableScroll.max)}
+                  onChange={(event) => {
+                    const nextPosition = Number(event.target.value);
+
+                    if (tableScrollRef.current) {
+                      tableScrollRef.current.scrollLeft = nextPosition;
+                      setTableScroll((current) => ({
+                        ...current,
+                        left: nextPosition,
+                      }));
+                    }
+                  }}
+                  aria-label="Scroll appointment table horizontally"
+                  className="h-2 min-w-0 flex-1 cursor-ew-resize accent-primary"
+                />
+
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  Swipe
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -1017,11 +1083,10 @@ export default function AdminAppointmentsPage() {
             className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
           >
             <div
-              className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                actionTarget.action === "confirm"
+              className={`flex h-12 w-12 items-center justify-center rounded-xl ${actionTarget.action === "confirm"
                   ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
                   : "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400"
-              }`}
+                }`}
             >
               {actionTarget.action === "confirm" ? (
                 <CheckCircle2 className="h-6 w-6" />
@@ -1039,11 +1104,11 @@ export default function AdminAppointmentsPage() {
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {actionTarget.action === "confirm"
                 ? `Are you sure you want to confirm the appointment for ${getCustomerName(
-                    actionTarget.appointment
-                  )}?`
+                  actionTarget.appointment
+                )}?`
                 : `Are you sure you want to cancel the appointment for ${getCustomerName(
-                    actionTarget.appointment
-                  )}?`}
+                  actionTarget.appointment
+                )}?`}
             </p>
 
             {actionError && (
@@ -1072,11 +1137,10 @@ export default function AdminAppointmentsPage() {
                 type="button"
                 onClick={handleAppointmentAction}
                 disabled={actionLoading}
-                className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white disabled:opacity-50 ${
-                  actionTarget.action === "confirm"
+                className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white disabled:opacity-50 ${actionTarget.action === "confirm"
                     ? "bg-emerald-600 hover:bg-emerald-700"
                     : "bg-red-600 hover:bg-red-700"
-                }`}
+                  }`}
               >
                 {actionLoading && (
                   <Loader2 className="h-4 w-4 animate-spin" />
